@@ -904,19 +904,6 @@ function PhantomForces:GetGun()
     return GunModel
 end
 
--- Returns the tip of the muzzle for our weapon, used for silent aimbot & autowall
-function PhantomForces:GetMuzzleParts(Gun)
-    local Muzzle = {}
-
-    for _, Part in pairs(Gun:GetChildren()) do
-        if Part.Name == 'Flame' or Part.Name == 'SightMark' or Part.Name == 'FlameSUP' then
-            table.insert(Muzzle, Part)
-        end
-    end
-
-    return Muzzle
-end
-
 function PhantomForces:GetPlayerModels()
     local PlayerList = {}
 
@@ -1307,55 +1294,6 @@ function Autowall:PlayerVisible(Player, Origin, End)
     return false
 end
 
-function Autowall:CalculatePenetration(Target, Gun)
-    local WeaponName = string.gsub(string.gsub(tostring(Gun.Name), "Main", ""), " ", "")
-    local WeaponPenetratrion = Storage.PenetrationDepth[WeaponName]
-
-    -- Fix for Knife, Grenades, Etc
-    if not WeaponPenetratrion then
-        WeaponPenetratrion = 0
-    end
-
-    local Ignore = {Camera, Workspace.Ignore}
-
-    for _, Part in pairs(PhantomForces:GetMuzzleParts(Gun)) do
-        local Direction = Target.Position - Part.Position
-        
-        local RayCastIgnore = Workspace:FindPartOnRayWithIgnoreList(
-            Ray.new(Part.Position, Direction),
-            Ignore, false, true
-        )
-
-        if not RayCastIgnore then
-            return true
-        end
-
-        local Penetrated = 0
-
-        for _, ObscuredPart in pairs(Camera:GetPartsObscuringTarget({Target.Position}, Ignore)) do
-            if ObscuredPart.CanCollide and ObscuredPart.Transparency ~= 1 and ObscuredPart.Name ~= "Window" then
-                local MaxRayLength = ObscuredPart.Size.Magnitude * Direction.Unit
-                
-                local _, Enter = game.Workspace:FindPartOnRayWithWhitelist(Ray.new(Part.Position, Direction), {ObscuredPart}, true)
-                local _, Exit = game.Workspace:FindPartOnRayWithWhitelist(Ray.new(Enter + MaxRayLength, -MaxRayLength), {ObscuredPart}, true)
-                
-                local Depth = (Exit - Enter).Magnitude;
-                
-                if Depth > WeaponPenetratrion then
-					Penetrated = Penetrated + Depth
-                end
-            else
-                table.insert(Ignore, ObscuredPart)
-            end
-        end
-
-        if Penetrated < WeaponPenetratrion then
-            Storage.TargetWithinFOV = true
-            return true
-        end
-    end
-end
-
 -- RAGEBOT
 local Ragebot = {}
 
@@ -1403,12 +1341,8 @@ function Ragebot:GetTarget(Targets, Gun)
 
                 -- Ts might be brokez a lil bit lol
                 if Angle <= Config.Ragebot.General.FieldOfView then
-                    if Config.Ragebot.General.AutoWall and not Autowall:CalculatePenetration(Part, Gun) then
+                    if not Autowall:PlayerVisible(Target, Camera.CFrame.Position, Part.Position) then
                         continue
-                    else
-                        if not Autowall:PlayerVisible(Target, Camera.CFrame.Position, Part.Position) then
-                            continue
-                        end
                     end
                     
                     -- OPTIONS: 'Crosshair', 'Distance', 'Health', 'Damage'
