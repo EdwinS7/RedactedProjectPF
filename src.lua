@@ -1,14 +1,32 @@
-if game.PlaceId ~= 292439477 and game.PlaceId ~= 299659045 then
-    error("Redacted-project is only supported by Phantom Forces!")
+-- Developers only, extra debugging options.
+local OverrideUserSettings = true
+
+-- Active developers: @fuckuneedthisfor & @distinguished_1
+
+-- Script Info:
+-- Script date, Project created (6/13/2024 : 5:18 PM)
+-- Script name: Redacted-project (placeholder)
+-- Script description: Phantom Forces Rage/Legit cheat
+
+local SupportedGames = { 
+    [292439477] = true, -- Phantom Forces
+    [299659045] = true -- Phantom Forces Test Place
+}
+
+if not SupportedGames[game.PlaceId] then
+    warn("[RedactedProject] Game unsupported! Clipboard set to PlaceId!")
+    setclipboard(tostring(game.PlaceId))
 end
 
+-- Script settings
 local Redacted = {
-    Username = "admin",
-    Developer = true,
+    Username = OverrideUserSettings and "admin" or "user1",
+    Build = OverrideUserSettings and 'developer' or 'live',
+
     Accent = Color3.fromRGB(140, 130, 255)
 }
 
--- Just decided to add this to the script itself, I don't wanna keep recreating a pastebin or host it on my github cuz its not mine! (custom ui library in development, no public release tho)
+-- UI Library 
     local InputService = game:GetService('UserInputService');
     local TextService = game:GetService('TextService');
     local CoreGui = game:GetService('CoreGui');
@@ -40,10 +58,10 @@ local Redacted = {
 
         HudRegistry = {};
 
+        AccentColor = Redacted.Accent;
         FontColor = Color3.fromRGB(255, 255, 255);
         MainColor = Color3.fromRGB(28, 28, 28);
         BackgroundColor = Color3.fromRGB(20, 20, 20);
-        AccentColor = Color3.fromRGB(0, 85, 255);
         OutlineColor = Color3.fromRGB(50, 50, 50);
         RiskColor = Color3.fromRGB(255, 50, 50),
 
@@ -3614,11 +3632,7 @@ local Redacted = {
         end
 
         Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
-            if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
-                if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
-                    task.spawn(Library.Toggle)
-                end
-            elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
+            if Input.KeyCode == Enum.KeyCode.Insert then
                 task.spawn(Library.Toggle)
             end
         end))
@@ -3644,239 +3658,819 @@ local Redacted = {
     Players.PlayerRemoving:Connect(OnPlayerChange);
 
     getgenv().Library = Library
+
+    local httpService = game:GetService('HttpService')
+
+    local SaveManager = {} do
+        SaveManager.Folder = 'LinoriaLibSettings'
+        SaveManager.Ignore = {}
+        SaveManager.Parser = {
+            Toggle = {
+                Save = function(idx, object) 
+                    return { type = 'Toggle', idx = idx, value = object.Value } 
+                end,
+                Load = function(idx, data)
+                    if Toggles[idx] then 
+                        Toggles[idx]:SetValue(data.value)
+                    end
+                end,
+            },
+            Slider = {
+                Save = function(idx, object)
+                    return { type = 'Slider', idx = idx, value = tostring(object.Value) }
+                end,
+                Load = function(idx, data)
+                    if Options[idx] then 
+                        Options[idx]:SetValue(data.value)
+                    end
+                end,
+            },
+            Dropdown = {
+                Save = function(idx, object)
+                    return { type = 'Dropdown', idx = idx, value = object.Value, mutli = object.Multi }
+                end,
+                Load = function(idx, data)
+                    if Options[idx] then 
+                        Options[idx]:SetValue(data.value)
+                    end
+                end,
+            },
+            ColorPicker = {
+                Save = function(idx, object)
+                    return { type = 'ColorPicker', idx = idx, value = object.Value:ToHex(), transparency = object.Transparency }
+                end,
+                Load = function(idx, data)
+                    if Options[idx] then 
+                        Options[idx]:SetValueRGB(Color3.fromHex(data.value), data.transparency)
+                    end
+                end,
+            },
+            KeyPicker = {
+                Save = function(idx, object)
+                    return { type = 'KeyPicker', idx = idx, mode = object.Mode, key = object.Value }
+                end,
+                Load = function(idx, data)
+                    if Options[idx] then 
+                        Options[idx]:SetValue({ data.key, data.mode })
+                    end
+                end,
+            },
+
+            Input = {
+                Save = function(idx, object)
+                    return { type = 'Input', idx = idx, text = object.Value }
+                end,
+                Load = function(idx, data)
+                    if Options[idx] and type(data.text) == 'string' then
+                        Options[idx]:SetValue(data.text)
+                    end
+                end,
+            },
+        }
+
+        function SaveManager:SetIgnoreIndexes(list)
+            for _, key in next, list do
+                self.Ignore[key] = true
+            end
+        end
+
+        function SaveManager:SetFolder(folder)
+            self.Folder = folder;
+            self:BuildFolderTree()
+        end
+
+        function SaveManager:Save(name)
+            if (not name) then
+                return false, 'no config file is selected'
+            end
+
+            local fullPath = self.Folder .. '/settings/' .. name .. '.json'
+
+            local data = {
+                objects = {}
+            }
+
+            for idx, toggle in next, Toggles do
+                if self.Ignore[idx] then continue end
+
+                table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
+            end
+
+            for idx, option in next, Options do
+                if not self.Parser[option.Type] then continue end
+                if self.Ignore[idx] then continue end
+
+                table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
+            end	
+
+            local success, encoded = pcall(httpService.JSONEncode, httpService, data)
+            if not success then
+                return false, 'failed to encode data'
+            end
+
+            writefile(fullPath, encoded)
+            return true
+        end
+
+        function SaveManager:Load(name)
+            if (not name) then
+                return false, 'no config file is selected'
+            end
+            
+            local file = self.Folder .. '/settings/' .. name .. '.json'
+            if not isfile(file) then return false, 'invalid file' end
+
+            local success, decoded = pcall(httpService.JSONDecode, httpService, readfile(file))
+            if not success then return false, 'decode error' end
+
+            for _, option in next, decoded.objects do
+                if self.Parser[option.type] then
+                    task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) -- task.spawn() so the config loading wont get stuck.
+                end
+            end
+
+            return true
+        end
+
+        function SaveManager:IgnoreThemeSettings()
+            self:SetIgnoreIndexes({ 
+                "BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor", -- themes
+                "ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName', -- themes
+            })
+        end
+
+        function SaveManager:BuildFolderTree()
+            local paths = {
+                self.Folder,
+                self.Folder .. '/themes',
+                self.Folder .. '/settings'
+            }
+
+            for i = 1, #paths do
+                local str = paths[i]
+                if not isfolder(str) then
+                    makefolder(str)
+                end
+            end
+        end
+
+        function SaveManager:RefreshConfigList()
+            local list = listfiles(self.Folder .. '/settings')
+
+            local out = {}
+            for i = 1, #list do
+                local file = list[i]
+                if file:sub(-5) == '.json' then
+                    -- i hate this but it has to be done ...
+
+                    local pos = file:find('.json', 1, true)
+                    local start = pos
+
+                    local char = file:sub(pos, pos)
+                    while char ~= '/' and char ~= '\\' and char ~= '' do
+                        pos = pos - 1
+                        char = file:sub(pos, pos)
+                    end
+
+                    if char == '/' or char == '\\' then
+                        table.insert(out, file:sub(pos + 1, start - 1))
+                    end
+                end
+            end
+            
+            return out
+        end
+
+        function SaveManager:SetLibrary(library)
+            self.Library = library
+        end
+
+        function SaveManager:LoadAutoloadConfig()
+            if isfile(self.Folder .. '/settings/autoload.txt') then
+                local name = readfile(self.Folder .. '/settings/autoload.txt')
+
+                local success, err = self:Load(name)
+                if not success then
+                    return self.Library:Notify('Failed to load autoload config: ' .. err)
+                end
+            end
+        end
+
+        function SaveManager:BuildConfigSection(tab)
+            assert(self.Library, 'Must set SaveManager.Library')
+
+            local section = tab:AddRightGroupbox('Configuration')
+
+            section:AddInput('SaveManager_ConfigName',    { Text = 'Config name' })
+            section:AddDropdown('SaveManager_ConfigList', { Text = 'Config list', Values = self:RefreshConfigList(), AllowNull = true })
+
+            section:AddDivider()
+
+            section:AddButton('Create config', function()
+                local name = Options.SaveManager_ConfigName.Value
+
+                if name:gsub(' ', '') == '' then 
+                    return self.Library:Notify('Invalid config name (empty)', 2)
+                end
+
+                local success, err = self:Save(name)
+                if not success then
+                    return self.Library:Notify('Failed to save config: ' .. err)
+                end
+
+                self.Library:Notify(string.format('Created config %q', name))
+
+                Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
+                Options.SaveManager_ConfigList:SetValue(nil)
+            end):AddButton('Load config', function()
+                local name = Options.SaveManager_ConfigList.Value
+
+                local success, err = self:Load(name)
+                if not success then
+                    return self.Library:Notify('Failed to load config: ' .. err)
+                end
+
+                self.Library:Notify(string.format('Loaded config %q', name))
+            end)
+
+            section:AddButton('Overwrite config', function()
+                local name = Options.SaveManager_ConfigList.Value
+
+                local success, err = self:Save(name)
+                if not success then
+                    return self.Library:Notify('Failed to overwrite config: ' .. err)
+                end
+
+                self.Library:Notify(string.format('Overwrote config %q', name))
+            end)
+
+            section:AddButton('Refresh list', function()
+                Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
+                Options.SaveManager_ConfigList:SetValue(nil)
+            end)
+
+            section:AddButton('Set as autoload', function()
+                local name = Options.SaveManager_ConfigList.Value
+                writefile(self.Folder .. '/settings/autoload.txt', name)
+                SaveManager.AutoloadLabel:SetText('Current autoload config: ' .. name)
+                self.Library:Notify(string.format('Set %q to auto load', name))
+            end)
+
+            SaveManager.AutoloadLabel = section:AddLabel('Current autoload config: none', true)
+
+            if isfile(self.Folder .. '/settings/autoload.txt') then
+                local name = readfile(self.Folder .. '/settings/autoload.txt')
+                SaveManager.AutoloadLabel:SetText('Current autoload config: ' .. name)
+            end
+
+            SaveManager:SetIgnoreIndexes({ 'SaveManager_ConfigList', 'SaveManager_ConfigName' })
+        end
+
+        SaveManager:BuildFolderTree()
+    end
 --
 
-local SaveManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua'))()
-local ThemeManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua'))()
+-- Renderer
+    local Renderer = {DrawList = {}}
 
--- Set default keybind & accent color
-Library.AccentColor = Redacted.Accent
+    function Renderer:FindExistingShape(name)
+        local Shape = Renderer.DrawList[name]
+        if Shape then
+            return Shape
+        else
+            return nil
+        end
+    end
+
+    function Renderer:Unrender(name_table)
+        for _, v in pairs(name_table) do
+            local Shape = self:FindExistingShape(v)
+        
+            if Shape then
+                Shape.Visible = false
+                Shape:Remove()
+            end
+
+            Renderer.DrawList[v] = nil
+        end
+    end
+
+    function Renderer:UnrenderAll()
+        for Name, Shape in pairs(Renderer.DrawList) do
+            if Shape then
+                Shape.Visible = false
+                Shape:Remove()
+            end
+
+            Renderer.DrawList[v] = nil
+        end
+    end
+
+    function Renderer:UnrenderAllExcept(exclude_table)
+        for Name, Shape in pairs(Renderer.DrawList) do
+            local ShouldContinue = false
+
+            for _, Exclude in pairs(exclude_table) do
+                if Exclude == Name then
+                    ShouldContinue = true
+                    break
+                end
+            end
+
+            if ShouldContinue then
+                ShouldContinue = false
+                continue
+            end
+
+            if Shape then
+                Shape.Visible = false
+                Shape:Remove()
+            end
+    
+            Renderer.DrawList[Name] = nil
+        end
+    end
+
+    function Renderer:Rectangle(name, position, size, color)
+        local Shape = self:FindExistingShape(name)
+        
+        if Shape then
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Size = size
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = false
+        else
+            Shape = Drawing.new("Square")
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Size = size
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = false
+            
+            Renderer.DrawList[name] = Shape
+        end
+        
+        return Shape
+    end
+
+    function Renderer:FilledRectangle(name, position, size, color)
+        local Shape = self:FindExistingShape(name)
+        
+        if Shape then
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Size = size
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = true
+        else
+            Shape = Drawing.new("Square")
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Size = size
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = true
+
+            Renderer.DrawList[name] = Shape
+        end
+        
+        return Shape
+    end
+
+    function Renderer:Circle(name, position, radius, color)
+        local Shape = self:FindExistingShape(name)
+        
+        if Shape then
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Radius = radius
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = false
+        else
+            Shape = Drawing.new("Circle")
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Radius = radius
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = false
+            
+            Renderer.DrawList[name] = Shape
+        end
+        
+        return Shape
+    end
+
+    function Renderer:FilledCircle(name, position, radius, color)
+        local Shape = self:FindExistingShape(name)
+        
+        if Shape then
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Radius = radius
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = true
+        else
+            Shape = Drawing.new("Circle")
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Radius = radius
+            Shape.Color = color
+            Shape.Transparency = 1
+            Shape.Filled = true
+            
+            Renderer.DrawList[name] = Shape
+        end
+        
+        return Shape
+    end
+
+    function Renderer:Line(name, from, to, color, thickness)
+        local Shape = self:FindExistingShape(name)
+        
+        if Shape then
+            Shape.Visible = true
+            Shape.From = from
+            Shape.To = to
+            Shape.Color = color
+            Shape.Thickness = thickness
+            Shape.Transparency = 1
+        else
+            Shape = Drawing.new("Line")
+            Shape.Visible = true
+            Shape.From = from
+            Shape.To = to
+            Shape.Color = color
+            Shape.Thickness = thickness
+            Shape.Transparency = 1
+            
+            Renderer.DrawList[name] = Shape
+        end
+        
+        return Shape
+    end
+
+    function Renderer:Text(name, position, text, color, size, font)
+        local Shape = self:FindExistingShape(name)
+        
+        if Shape then
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Text = text
+            Shape.Color = color
+            Shape.Size = size
+            Shape.Font = font
+            Shape.Transparency = 1
+        else
+            Shape = Drawing.new("Text")
+            Shape.Visible = true
+            Shape.Position = position
+            Shape.Text = text
+            Shape.Color = color
+            Shape.Size = size
+            Shape.Font = font
+            Shape.Transparency = 1
+            
+            Renderer.DrawList[name] = Shape
+        end
+        
+        return Shape
+    end
+--
+
+-- Custom functions
+    -- https://devforum.roblox.com/t/tutorial-check-if-an-object-has-property/1213998
+    function ObjectHasProperty(object, propertyName)
+        local success, _ = pcall(function() 
+            object[propertyName] = object[propertyName]
+        end)
+        return success
+    end
+
+    local function GetTableKeys(tbl)
+        local keyset = {}
+        for k in pairs(tbl) do
+            table.insert(keyset, k)
+        end
+        return keyset
+    end
+--
 
 -- Get Services
-local Debris = game:GetService("Debris")
-local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
-local NetworkClient = game:service("NetworkClient")
-local TeleportService = game:GetService("TeleportService")
-local UserInputService = game:GetService("UserInputService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local MarketPlaceService = game:GetService("MarketplaceService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Debris = game:GetService("Debris")
+    local Players = game:GetService("Players")
+    local Lighting = game:GetService("Lighting")
+    local Workspace = game:GetService("Workspace")
+    local RunService = game:GetService("RunService")
+    local HttpService = game:GetService("HttpService")
+    local NetworkClient = game:service("NetworkClient")
+    local TeleportService = game:GetService("TeleportService")
+    local UserInputService = game:GetService("UserInputService")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    local MarketPlaceService = game:GetService("MarketplaceService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+--
 
 -- Get/Create Game Vars
-local Enviornment = getgenv()
-local Camera = Workspace.CurrentCamera
-local Base64Encode = base64encode
-local Base64Decode = base64decode
-local ColorRGB = Color3.fromRGB
-local ColorHSV = Color3.fromHSV
-local ColorHex = Color3.fromHex
-local Vec2 = Vector2.new
-local Vec3 = Vector3.new
+    local Enviornment = getgenv()
+    local Camera = Workspace.CurrentCamera
+    local Base64Encode = base64encode
+    local Base64Decode = base64decode
+    local ColorRGB = Color3.fromRGB
+    local ColorHSV = Color3.fromHSV
+    local ColorHex = Color3.fromHex
+    local Vec2 = Vector2.new
+    local Vec3 = Vector3.new
+--
 
--- Custom Functions
--- https://devforum.roblox.com/t/tutorial-check-if-an-object-has-property/1213998
-function ObjectHasProperty(object, propertyName)
-    local success, _ = pcall(function() 
-        object[propertyName] = object[propertyName]
-    end)
-    return success
-end
+--[[ Get Phantom Force modules
+    local Modules = {}
 
---[[ PF Modules
-local Modules = {}
+    for _,instance in next, getnilinstances() do
+        if not instance:IsA("ModuleScript") then
+            continue
+        end
 
-for _,instance in next, getnilinstances() do
-    if not instance:IsA("ModuleScript") then
-        continue
+        local Required = nil
+        pcall(function()
+            Required = require(instance)
+        end)
+
+        if not Required then
+            continue
+        end
+
+        Modules[instance.Name] = Required
     end
 
-    local Required = nil
-    pcall(function()
-        Required = require(instance)
-    end)
+    for _,instance in next, getloadedmodules() do
+        if Modules[instance.Name] then
+            continue
+        end
 
-    if not Required then
-        continue
+        local Required = nil
+        pcall(function()
+            Required = require(instance)
+        end)
+
+        if not Required then
+            continue
+        end
+
+        Modules[instance.Name] = Required
     end
 
-    Modules[instance.Name] = Required
-end
-
-for _,instance in next, getloadedmodules() do
-    if Modules[instance.Name] then
-        continue
+    function GetModule(name)
+        return Modules[name] or nil
     end
 
-    local Required = nil
-    pcall(function()
-        Required = require(instance)
-    end)
+    local RoundSystemClientInterface = GetModule("RoundSystemClientInterface")
+    local WeaponControllerInterface = GetModule("WeaponControllerInterface")
+    local PlayerDataClientInterface = GetModule("PlayerDataClientInterface")
+    local HudCrosshairsInterface = GetModule("HudCrosshairsInterface") 
+    local LeaderboardInterface = GetModule("LeaderboardInterface")
+    local ReplicationInterface = GetModule("ReplicationInterface")
+    local CharacterInterface = GetModule("CharacterInterface")
+    local ActiveLoadoutUtils = GetModule("ActiveLoadoutUtils")
+    local PlayerStatusEvents = GetModule("PlayerStatusEvents")
+    local ReplicationObject = GetModule("ReplicationObject")
+    local ThirdPersonObject = GetModule("ThirdPersonObject")
+    local ContentDatabase = GetModule("ContentDatabase")
+    local BulletInterface = GetModule("BulletInterface")
+    local CharacterObject = GetModule("CharacterObject")
+    local CameraInterface = GetModule("CameraInterface")
+    local CameraObject = GetModule("MainCameraObject")
+    local PublicSettings = GetModule("PublicSettings")
+    local FirearmObject = GetModule("FirearmObject")
+    local NetworkClient = GetModule("NetworkClient")
+    local BulletObject = GetModule("BulletObject")
+    local MeleeObject = GetModule("MeleeObject")
+    local BulletCheck = GetModule("BulletCheck")
+    local GameClock = GetModule("GameClock")
+    local Physics = GetModule("PhysicsLib")
+    local Sound = GetModule("AudioSystem")
+    local Effects = GetModule("Effects")
+--]]
 
-    if not Required then
-        continue
-    end
-
-    Modules[instance.Name] = Required
-end
-
-function GetModule(name)
-    return Modules[name] or nil
-end
-
-local RoundSystemClientInterface = GetModule("RoundSystemClientInterface")
-local WeaponControllerInterface = GetModule("WeaponControllerInterface")
-local PlayerDataClientInterface = GetModule("PlayerDataClientInterface")
-local HudCrosshairsInterface = GetModule("HudCrosshairsInterface") 
-local LeaderboardInterface = GetModule("LeaderboardInterface")
-local ReplicationInterface = GetModule("ReplicationInterface")
-local CharacterInterface = GetModule("CharacterInterface")
-local ActiveLoadoutUtils = GetModule("ActiveLoadoutUtils")
-local PlayerStatusEvents = GetModule("PlayerStatusEvents")
-local ReplicationObject = GetModule("ReplicationObject")
-local ThirdPersonObject = GetModule("ThirdPersonObject")
-local ContentDatabase = GetModule("ContentDatabase")
-local BulletInterface = GetModule("BulletInterface")
-local CharacterObject = GetModule("CharacterObject")
-local CameraInterface = GetModule("CameraInterface")
-local CameraObject = GetModule("MainCameraObject")
-local PublicSettings = GetModule("PublicSettings")
-local FirearmObject = GetModule("FirearmObject")
-local NetworkClient = GetModule("NetworkClient")
-local BulletObject = GetModule("BulletObject")
-local MeleeObject = GetModule("MeleeObject")
-local BulletCheck = GetModule("BulletCheck")
-local GameClock = GetModule("GameClock")
-local Physics = GetModule("PhysicsLib")
-local Sound = GetModule("AudioSystem")
-local Effects = GetModule("Effects")]]
-
--- Config/Default Config
-local Config = {
-    Ragebot = {
-        General = {
-            Enabled = false,
-            FieldOfViewMode = 0,
-            FieldOfView = 180,
-
-            -- OPTIONS: {"Closest to crosshair", "Distance"}
-            TargetSelection = 0,
-
-            AutoWall = false,
-            Autofire = false,
-    
-            Hitboxes = {}
-        },
-
-        Other = {}
-    },
-
-    AntiAim = {
-        General = {
-            Enabled = false,
-        },
-
-        FakeLag = {
-            Enabled = false,
-            MinDistance = 1,
-            MaxDistance = 40
-        }
-    },
-
-    Visuals = {
-        Players = {
-            Boxes = {
+-- Config/Stored menu variables
+    local Config = {
+        Ragebot = {
+            General = {
                 Enabled = false,
-                Color = ColorRGB(255, 255, 255)
+                FieldOfViewMode = 'Circle', -- {'Circle', 'Angle'}
+                FieldOfView = 180,
+
+                TargetSelection = 'Crosshair', -- {'Crosshair', 'Distance', 'Health', 'Damage'}
+
+                AutoWall = false,
+                Autofire = false,
+        
+                Hitboxes = {} -- {'Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg'}
             },
 
-            Chams = { 
+            Other = {}
+        },
+
+        Antiaim = {
+            General = {
                 Enabled = false,
-                FillColor = ColorRGB(0, 0, 0),
-                OutlineColor = Redacted.Accent
             },
+
+            FakeLag = {
+                Enabled = false,
+                MinDistance = 1,
+                MaxDistance = 40
+            }
+        },
+
+        Visuals = {
+            Players = {
+                Boxes = {
+                    Enabled = false,
+                    Color = ColorRGB(255, 255, 255)
+                },
+
+                Chams = { 
+                    Enabled = false,
+                    FillColor = ColorRGB(0, 0, 0),
+                    OutlineColor = Redacted.Accent
+                },
+                
+                WeaponChams = {
+                    Enabled = false,
+                    Color = Redacted.Accent,
+
+                    -- OPTIONS: Storage.PartMaterials
+                    Material = 'ForceField' -- Storage.PartMaterials
+                },
+
+                ArmChams = {
+                    Enabled = false,
+                    Color = Redacted.Accent,
+
+                    Material = 'ForceField' -- Storage.PartMaterials
+                }
+            },
+
+            World = {
+                OverrideTechnology = 'Compatibility',
+                MirrorWorld = false,
+                NightMode = false,
             
-            WeaponChams = {
-                Enabled = false,
-                Color = Redacted.Accent,
+                OverrideAmbient = {
+                    Enabled = false, 
+                    Color = Redacted.Accent
+                },
 
-                -- OPTIONS: Storage.PartMaterials
-                Material = 22 -- ForceField Default
+                SkyboxChanger = {
+                    Enabled = false,
+                    Value = "Neptune"
+                }
             },
 
-            ArmChams = {
-                Enabled = false,
-                Color = Redacted.Accent,
+            Throwables = {},
 
-                -- OPTIONS: Storage.PartMaterials
-                Material = 22 -- ForceField Default
+            Other = {
+                Crosshair = {
+                    Enabled = false,
+                    Color = ColorRGB(255, 255, 255)
+                },
+
+                VisualizeFOV = {
+                    Enabled = false,
+                    ActiveColor = ColorRGB(25, 255, 25), -- Light green
+                    InactiveColor = ColorRGB(255, 25, 25) -- Light red
+                }
             }
         },
 
-        World = {
-            OverrideTechnology = 'Compatibility',
-            MirrorWorld = false,
-            NightMode = false,
-        
-            OverrideAmbient = {
-                Enabled = false, 
-                Color = Redacted.Accent
+        Misc = {
+            Movement = {
+                Bhop = false,
+            
+                FlyHack = {
+                    Enabled = false,
+                    Value = 40
+                },
+
+                SpeedHack = {
+                    Enabled = false,
+                    Value = 45
+                }
             },
 
-            SkyboxChanger = {
-                Enabled = false,
-                Value = "Neptune"
+            Other = {
+                OverrideHipheight = {
+                    Enabled = false,
+                    Height = 20
+                },
             }
-        },
-
-        Throwables = {},
-
-        Other = {
-            Crosshair = {
-                Enabled = false,
-                Color = ColorRGB(255, 255, 255)
-            },
-
-            VisualizeFOV = {
-                Enabled = false,
-                ActiveColor = ColorRGB(25, 255, 25), -- Light green
-                InactiveColor = ColorRGB(255, 25, 25) -- Light red
-            }
-        }
-    },
-
-    Misc = {
-        Movement = {
-            Bhop = false,
-        
-            FlyHack = {
-                Enabled = false,
-                Value = 40
-            },
-
-            SpeedHack = {
-                Enabled = false,
-                Value = 45
-            }
-        },
-
-        Other = {
-            OverrideHipheight = {
-                Enabled = false,
-                Height = 20
-            },
         }
     }
-}
+--
 
 -- Saved/Stored data, Used for mostly everything in our script requiring resetable data.
 local Storage = {
-    PenetrationDepth = {['AK12'] = 1.00,['AN-94'] = 1.00,['REMINGTON700'] = 3.00,['ASVAL'] = 1.00,['SCAR-L'] = 1.00,['AUGA1'] = 1.00,['M16A4'] = 1.10,['G36'] = 1.30,['M16A1'] = 0.80,['M16A3'] = 1.10,['TYPE20'] = 1.40,['AUGA2'] = 1.00,['K2'] = 1.00,['FAMASF1'] = 1.00,['AK47'] = 1.40,['AKM'] = 1.40,['AK103'] = 1.40,['TAR-21'] = 1.20,['TYPE88'] = 0.90,['M231'] = 1.00,['C7A2'] = 0.90,['STG-44'] = 1.60,['G11K2'] = 2.00,['M14'] = 1.80,['BEOWULFECR'] = 1.90,['SCAR-H'] = 1.50,['AK12BR'] = 2.00,['G3A3'] = 1.50,['AG-3'] = 2.00,['HK417'] = 1.60,['HENRY45-70'] = 2.00,['FAL50.00'] = 2.00,['HCAR'] = 2.20,['M4A1'] = 1.00,['G36K'] = 1.10,['M4'] = 1.00,['L22'] = 0.90,['SCARPDW'] = 0.90,['AKU12'] = 1.00,['GROZA-1'] = 1.50,['OTS-126'] = 1.20,['AK12C'] = 1.20,['HONEYBADGER'] = 1.30,['K1A'] = 0.75,['SR-3M'] = 1.00,['GROZA-4'] = 1.50,['MC51'] = 1.50,['FAL50.63PARA'] = 2.00,['1858CARBINE'] = 0.50,['AK105'] = 1.00,['JURY'] = 1.00,['KACSRR'] = 1.00,['GYROJETCARBINE'] = 0.70,['C8A2'] = 0.80,['X95R'] = 1.00,['HK51B'] = 1.90,['CANCANNON'] = 1.20,['KSG12'] = 0.40,['MODEL870'] = 0.50,['DBV12'] = 0.50,['KS-23M'] = 0.70,['SAIGA-12'] = 0.50,['STEVENSDB'] = 0.50,['E-GUN'] = 0.50,['AA-12'] = 0.30,['SPAS-12'] = 0.60,['DT11'] = 0.70,['USAS-12'] = 0.30,['MK11'] = 1.70,['SKS'] = 1.50,['SL-8'] = 1.30,['DRAGUNOVSVU'] = 2.80,['VSSVINTOREZ'] = 1.50,['MSG90'] = 2.00,['M21'] = 2.40,['BEOWULFTCR'] = 3.00,['SA58SPR'] = 2.00,['SCARSSR'] = 2.60,['COLTLMG'] = 1.40,['M60'] = 2.20,['AUGHBAR'] = 1.60,['MG36'] = 1.80,['RPK12'] = 1.60,['L86LSW'] = 1.60,['RPK'] = 1.60,['HK21E'] = 1.60,['HAMRIAR'] = 1.40,['RPK74'] = 1.20,['MG3KWS'] = 1.80,['M1918A2'] = 2.20,['MGV-176'] = 0.50,['STONER96'] = 1.20,['CHAINSAW'] = 1.20,['MG42'] = 2.00,['INTERVENTION'] = 4.00,['MODEL700'] = 3.00,['AWS'] = 2.00,['BFG50'] = 10.00,['AWM'] = 3.00,['TRG-42'] = 3.00,['MOSINNAGANT'] = 3.50,['DRAGUNOVSVDS'] = 3.20,['M1903'] = 3.80,['K14'] = 3.00,['HECATEII'] = 10.00,['FT300'] = 3.00,['M107'] = 5.00,['STEYRSCOUT'] = 3.00,['WA2000'] = 2.80,['NTW-20'] = 20.00,['M9'] = 0.50,['G17'] = 0.50,['M1911A1'] = 0.50,['M17'] = 0.50,['DESERTEAGLEL5'] = 1.00,['G21'] = 0.50,['G23'] = 0.60,['M45A1'] = 0.50,['G40'] = 0.80,['KG-99'] = 0.50,['G50'] = 1.00,['FIVESEVEN'] = 1.20,['ZIP22'] = 0.50,['GIM1'] = 1.00,['HARDBALLER'] = 0.80,['IZHEVSKPB'] = 0.50,['MAKAROVPM'] = 0.50,['GB-22'] = 0.50,['DESERTEAGLEXIX'] = 1.30,['AUTOMAGIII'] = 1.20,['GYROJETMARKI'] = 0.50,['GSP'] = 0.10,['GRIZZLY'] = 1.30,['M2011'] = 0.50,['ALIEN'] = 0.50,['AF2011-A1'] = 0.50,['G18C'] = 0.50,['93R'] = 0.50,['PP-2000'] = 1.00,['TEC-9'] = 0.50,['MICROUZI'] = 0.50,['ŠKORPIONVZ.61'] = 0.50,['ASMI'] = 0.50,['MP1911'] = 0.50,['ARMPISTOL'] = 0.90,['MP412REX'] = 0.50,['MATEBA6'] = 1.00,['1858NEWARMY'] = 0.50,['REDHAWK44'] = 1.00,['JUDGE'] = 1.00,['EXECUTIONER'] = 1.00,['SUPERSHORTY'] = 0.60,['SFG50'] = 10.00,['M79THUMPER'] = 0.50,['COILGUN'] = 0.50,['SAWEDOFF'] = 0.60,['SAIGA-12U'] = 0.40,['OBREZ'] = 2.00,['SASS308'] = 2.00,['GLOCK17'] = 0.50};
-	WeaponVelocity  =  {['AK12'] = 2950.00,['REMINGTON700'] = 2650,['AN-94'] = 2950.00 ,['ASVAL'] = 1500.00 ,['SCAR-L'] = 2300.00 ,['AUGA1'] = 3200.00 ,['M16A4'] = 2700.00 ,['G36'] = 2700.00 ,['M16A1'] = 3100.00 ,['M16A3'] = 2700.00 ,['TYPE20'] = 2625.00 ,['AUGA2'] = 3200.00 ,['K2'] = 2400.00 ,['FAMASF1'] = 3100.00 ,['AK47'] = 2350.00 ,['AUGA3'] = 3200.00,['L85A2'] = 2500.00,['HK416'] = 2500.00,['AK74'] = 2900.00,['AKM'] = 2350.00,['AK103'] = 2350.00,['TAR-21'] = 2800.00,['TYPE88'] = 2950.00,['M231'] = 2200.00,['C7A2'] = 2800.00,['STG-44'] = 2250.00,['G11K2'] = 3100.00,['M14'] = 2550.00,['BEOWULFECR'] = 1800.00,['SCAR-H'] = 2900.00,['AK12BR'] = 2700.00,['G3A3'] = 2600.00,['AG-3'] = 2600.00,['HK417'] = 2500.00,['HENRY45-70'] = 1800.00,['FAL50.00'] = 2750.00,['HCAR'] = 2500.00,['M4A1'] = 2200.00,['G36K'] = 2500.00,['M4'] = 2200.00,['L22'] = 2000.00,['SCARPDW'] = 2200.00,['AKU12'] = 2550.00,['GROZA-1'] = 2400.00,['OTS-126'] = 2300.00,['AK12C'] = 2150.00,['HONEYBADGER'] = 2000.00,['K1A'] = 1700.00,['SR-3M'] = 2000.00,['GROZA-4'] = 1200.00,['MC51'] = 2000.00,['FAL50.63PARA'] = 2200.00,['1858CARBINE'] = 1500.00,['AK105'] = 2800.00,['JURY'] = 1500.00,['KACSRR'] = 1500.00,['GYROJETCARBINE'] = 50.00,['C8A2'] = 2400.00,['X95R'] = 2200.00,['HK51B'] = 2200.00,['CANCANNON'] = 1000.00,['KSG12'] = 1500.00,['MODEL870'] = 1500.00,['DBV12'] = 1500.00,['KS-23M'] = 1500.00,['SAIGA-12'] = 1500.00,['STEVENSDB'] = 1600.00,['E-GUN'] = 950.00,['AA-12'] = 1500.00,['SPAS-12'] = 1500.00,['DT11'] = 2000.00,['USAS-12'] = 1300.00,['MP5K'] = 1200.00,['UMP45'] = 870.00,['G36C'] = 2300.00,['MP7'] = 2400.00,['MAC10'] = 920.00,['P90'] = 2350.00,['COLTMARS'] = 2600.00,['MP5'] = 1300.00,['COLTSMG633'] = 1300.00,['L2A3'] = 1280.00,['MP5SD'] = 1050.00,['MP10'] = 1300.00,['M3A1'] = 900.00,['MP5/10'] = 1400.00,['UZI'] = 1300.00,['AUGA3PARAXS'] = 1200.00,['K7'] = 1300.00,['AKS74U'] = 2400.00,['PPSH-41'] = 1600.00,['FALPARASHORTY'] = 2000.00,['KRISSVECTOR'] = 960.00,['PP-19BIZON'] = 1250.00,['MP40'] = 1310.00,['X95SMG'] = 1300.00,['TOMMYGUN'] = 935.00,['RAMA1130'] = 1300.00,['BWC9A'] = 1300.00,['FIVE-0'] = 1200.00,['MK11'] = 2800.00,['SKS'] = 2500.00,['SL-8'] = 2800.00,['DRAGUNOVSVU'] = 2700.00,['VSSVINTOREZ'] = 2000.00,['MSG90'] = 2800.00,['M21'] = 2650.00,['BEOWULFTCR'] = 1800.00,['SA58SPR'] = 2500.00,['SCARSSR'] = 3000.00,['COLTLMG'] = 2500.00,['M60'] = 2800.00,['AUGHBAR'] = 3300.00,['MG36'] = 2700.00,['RPK12'] = 3100.00,['L86LSW'] = 3100.00,['RPK'] = 2450.00,['HK21E'] = 2600.00,['HAMRIAR'] = 2600.00,['RPK74'] = 3150.00,['MG3KWS'] = 2700.00,['M1918A2'] = 2800.00,['MGV-176'] = 1550.00,['STONER96'] = 3000.00,['CHAINSAW'] = 3000.00,['MG42'] = 2400.00,['INTERVENTION'] = 3000.00,['MODEL700'] = 2650.00,['AWS'] = 2500.00,['BFG50'] = 3000.00,['AWM'] = 3000.00,['TRG-42'] = 3000.00,['MOSINNAGANT'] = 3000.00,['DRAGUNOVSVDS'] = 2650.00,['M1903'] = 3000.00,['K14'] = 2800.00,['HECATEII'] = 3000.00,['FT300'] = 2800.00,['M107'] = 2800.00,['STEYRSCOUT'] = 3000.00,['WA2000'] = 2850.00,['NTW-20'] = 2400.00,['M9'] = 1300.00,['G17'] = 1230.00,['M1911A1'] = 830.00,['M17'] = 1200.00,['DESERTEAGLEL5'] = 1700.00,['G21'] = 810.00,['G23'] = 1025.00,['M45A1'] = 830.00,['G40'] = 1350.00,['KG-99'] = 1500.00,['G50'] = 1250.00,['FIVESEVEN'] = 2500.00,['ZIP22'] = 1600.00,['GIM1'] = 875.00,['HARDBALLER'] = 1400.00,['IZHEVSKPB'] = 950.00,['MAKAROVPM'] = 1030.00,['GB-22'] = 1900.00,['DESERTEAGLEXIX'] = 1425.00,['AUTOMAGIII'] = 1700.00,['GYROJETMARKI'] = 25.00,['GSP'] = 1800.00,['GRIZZLY'] = 1500.00,['M2011'] = 1300.00,['ALIEN'] = 1300.00,['AF2011-A1'] = 1250.00,['G18C'] = 1230.00,['93R'] = 1200.00,['PP-2000'] = 2000.00,['TEC-9'] = 1180.00,['MICROUZI'] = 2000.00,['ŠKORPIONVZ.61'] = 1200.00,['ASMI'] = 1260.00,['MP1911'] = 830.00,['ARMPISTOL'] = 2300.00,['MP412REX'] = 1700.00,['MATEBA6'] = 1450.00,['1858NEWARMY'] = 1000.00,['REDHAWK44'] = 1600.00,['JUDGE'] = 2000.00,['EXECUTIONER'] = 2000.00,['SUPERSHORTY'] = 1400.00,['SFG50'] = 2000.00,['M79THUMPER'] = 900.00,['COILGUN'] = 950.00,['SAWEDOFF'] = 1300.00,['SAIGA-12U'] = 1400.00,['OBREZ'] = 1500.00,['SASS308'] = 3000.00,['GLOCK17'] = 1230.00};
-	
+    PenetrationDepth = {['AK12'] = 1.00,['AN-94'] = 1.00,['REMINGTON700'] = 3.00,['ASVAL'] = 1.00,['SCAR-L'] = 1.00,['AUGA1'] = 1.00,['M16A4'] = 1.10,['G36'] = 1.30,['M16A1'] = 0.80,['M16A3'] = 1.10,['TYPE20'] = 1.40,['AUGA2'] = 1.00,['K2'] = 1.00,['FAMASF1'] = 1.00,['AK47'] = 1.40,['AKM'] = 1.40,['AK103'] = 1.40,['TAR-21'] = 1.20,['TYPE88'] = 0.90,['M231'] = 1.00,['C7A2'] = 0.90,['STG-44'] = 1.60,['G11K2'] = 2.00,['M14'] = 1.80,['BEOWULFECR'] = 1.90,['SCAR-H'] = 1.50,['AK12BR'] = 2.00,['G3A3'] = 1.50,['AG-3'] = 2.00,['HK417'] = 1.60,['HENRY45-70'] = 2.00,['FAL50.00'] = 2.00,['HCAR'] = 2.20,['M4A1'] = 1.00,['G36K'] = 1.10,['M4'] = 1.00,['L22'] = 0.90,['SCARPDW'] = 0.90,['AKU12'] = 1.00,['GROZA-1'] = 1.50,['OTS-126'] = 1.20,['AK12C'] = 1.20,['HONEYBADGER'] = 1.30,['K1A'] = 0.75,['SR-3M'] = 1.00,['GROZA-4'] = 1.50,['MC51'] = 1.50,['FAL50.63PARA'] = 2.00,['1858CARBINE'] = 0.50,['AK105'] = 1.00,['JURY'] = 1.00,['KACSRR'] = 1.00,['GYROJETCARBINE'] = 0.70,['C8A2'] = 0.80,['X95R'] = 1.00,['HK51B'] = 1.90,['CANCANNON'] = 1.20,['KSG12'] = 0.40,['MODEL870'] = 0.50,['DBV12'] = 0.50,['KS-23M'] = 0.70,['SAIGA-12'] = 0.50,['STEVENSDB'] = 0.50,['E-GUN'] = 0.50,['AA-12'] = 0.30,['SPAS-12'] = 0.60,['DT11'] = 0.70,['USAS-12'] = 0.30,['MK11'] = 1.70,['SKS'] = 1.50,['SL-8'] = 1.30,['DRAGUNOVSVU'] = 2.80,['VSSVINTOREZ'] = 1.50,['MSG90'] = 2.00,['M21'] = 2.40,['BEOWULFTCR'] = 3.00,['SA58SPR'] = 2.00,['SCARSSR'] = 2.60,['COLTLMG'] = 1.40,['M60'] = 2.20,['AUGHBAR'] = 1.60,['MG36'] = 1.80,['RPK12'] = 1.60,['L86LSW'] = 1.60,['RPK'] = 1.60,['HK21E'] = 1.60,['HAMRIAR'] = 1.40,['RPK74'] = 1.20,['MG3KWS'] = 1.80,['M1918A2'] = 2.20,['MGV-176'] = 0.50,['STONER96'] = 1.20,['CHAINSAW'] = 1.20,['MG42'] = 2.00,['INTERVENTION'] = 4.00,['MODEL700'] = 3.00,['AWS'] = 2.00,['BFG50'] = 10.00,['AWM'] = 3.00,['TRG-42'] = 3.00,['MOSINNAGANT'] = 3.50,['DRAGUNOVSVDS'] = 3.20,['M1903'] = 3.80,['K14'] = 3.00,['HECATEII'] = 10.00,['FT300'] = 3.00,['M107'] = 5.00,['STEYRSCOUT'] = 3.00,['WA2000'] = 2.80,['NTW-20'] = 20.00,['M9'] = 0.50,['G17'] = 0.50,['M1911A1'] = 0.50,['M17'] = 0.50,['DESERTEAGLEL5'] = 1.00,['G21'] = 0.50,['G23'] = 0.60,['M45A1'] = 0.50,['G40'] = 0.80,['KG-99'] = 0.50,['G50'] = 1.00,['FIVESEVEN'] = 1.20,['ZIP22'] = 0.50,['GIM1'] = 1.00,['HARDBALLER'] = 0.80,['IZHEVSKPB'] = 0.50,['MAKAROVPM'] = 0.50,['GB-22'] = 0.50,['DESERTEAGLEXIX'] = 1.30,['AUTOMAGIII'] = 1.20,['GYROJETMARKI'] = 0.50,['GSP'] = 0.10,['GRIZZLY'] = 1.30,['M2011'] = 0.50,['ALIEN'] = 0.50,['AF2011-A1'] = 0.50,['G18C'] = 0.50,['93R'] = 0.50,['PP-2000'] = 1.00,['TEC-9'] = 0.50,['MICROUZI'] = 0.50,['ŠKORPIONVZ.61'] = 0.50,['ASMI'] = 0.50,['MP1911'] = 0.50,['ARMPISTOL'] = 0.90,['MP412REX'] = 0.50,['MATEBA6'] = 1.00,['1858NEWARMY'] = 0.50,['REDHAWK44'] = 1.00,['JUDGE'] = 1.00,['EXECUTIONER'] = 1.00,['SUPERSHORTY'] = 0.60,['SFG50'] = 10.00,['M79THUMPER'] = 0.50,['COILGUN'] = 0.50,['SAWEDOFF'] = 0.60,['SAIGA-12U'] = 0.40,['OBREZ'] = 2.00,['SASS308'] = 2.00,['GLOCK17'] = 0.50},
+    WeaponVelocity  =  {['AK12'] = 2950.00,['REMINGTON700'] = 2650,['AN-94'] = 2950.00 ,['ASVAL'] = 1500.00 ,['SCAR-L'] = 2300.00 ,['AUGA1'] = 3200.00 ,['M16A4'] = 2700.00 ,['G36'] = 2700.00 ,['M16A1'] = 3100.00 ,['M16A3'] = 2700.00 ,['TYPE20'] = 2625.00 ,['AUGA2'] = 3200.00 ,['K2'] = 2400.00 ,['FAMASF1'] = 3100.00 ,['AK47'] = 2350.00 ,['AUGA3'] = 3200.00,['L85A2'] = 2500.00,['HK416'] = 2500.00,['AK74'] = 2900.00,['AKM'] = 2350.00,['AK103'] = 2350.00,['TAR-21'] = 2800.00,['TYPE88'] = 2950.00,['M231'] = 2200.00,['C7A2'] = 2800.00,['STG-44'] = 2250.00,['G11K2'] = 3100.00,['M14'] = 2550.00,['BEOWULFECR'] = 1800.00,['SCAR-H'] = 2900.00,['AK12BR'] = 2700.00,['G3A3'] = 2600.00,['AG-3'] = 2600.00,['HK417'] = 2500.00,['HENRY45-70'] = 1800.00,['FAL50.00'] = 2750.00,['HCAR'] = 2500.00,['M4A1'] = 2200.00,['G36K'] = 2500.00,['M4'] = 2200.00,['L22'] = 2000.00,['SCARPDW'] = 2200.00,['AKU12'] = 2550.00,['GROZA-1'] = 2400.00,['OTS-126'] = 2300.00,['AK12C'] = 2150.00,['HONEYBADGER'] = 2000.00,['K1A'] = 1700.00,['SR-3M'] = 2000.00,['GROZA-4'] = 1200.00,['MC51'] = 2000.00,['FAL50.63PARA'] = 2200.00,['1858CARBINE'] = 1500.00,['AK105'] = 2800.00,['JURY'] = 1500.00,['KACSRR'] = 1500.00,['GYROJETCARBINE'] = 50.00,['C8A2'] = 2400.00,['X95R'] = 2200.00,['HK51B'] = 2200.00,['CANCANNON'] = 1000.00,['KSG12'] = 1500.00,['MODEL870'] = 1500.00,['DBV12'] = 1500.00,['KS-23M'] = 1500.00,['SAIGA-12'] = 1500.00,['STEVENSDB'] = 1600.00,['E-GUN'] = 950.00,['AA-12'] = 1500.00,['SPAS-12'] = 1500.00,['DT11'] = 2000.00,['USAS-12'] = 1300.00,['MP5K'] = 1200.00,['UMP45'] = 870.00,['G36C'] = 2300.00,['MP7'] = 2400.00,['MAC10'] = 920.00,['P90'] = 2350.00,['COLTMARS'] = 2600.00,['MP5'] = 1300.00,['COLTSMG633'] = 1300.00,['L2A3'] = 1280.00,['MP5SD'] = 1050.00,['MP10'] = 1300.00,['M3A1'] = 900.00,['MP5/10'] = 1400.00,['UZI'] = 1300.00,['AUGA3PARAXS'] = 1200.00,['K7'] = 1300.00,['AKS74U'] = 2400.00,['PPSH-41'] = 1600.00,['FALPARASHORTY'] = 2000.00,['KRISSVECTOR'] = 960.00,['PP-19BIZON'] = 1250.00,['MP40'] = 1310.00,['X95SMG'] = 1300.00,['TOMMYGUN'] = 935.00,['RAMA1130'] = 1300.00,['BWC9A'] = 1300.00,['FIVE-0'] = 1200.00,['MK11'] = 2800.00,['SKS'] = 2500.00,['SL-8'] = 2800.00,['DRAGUNOVSVU'] = 2700.00,['VSSVINTOREZ'] = 2000.00,['MSG90'] = 2800.00,['M21'] = 2650.00,['BEOWULFTCR'] = 1800.00,['SA58SPR'] = 2500.00,['SCARSSR'] = 3000.00,['COLTLMG'] = 2500.00,['M60'] = 2800.00,['AUGHBAR'] = 3300.00,['MG36'] = 2700.00,['RPK12'] = 3100.00,['L86LSW'] = 3100.00,['RPK'] = 2450.00,['HK21E'] = 2600.00,['HAMRIAR'] = 2600.00,['RPK74'] = 3150.00,['MG3KWS'] = 2700.00,['M1918A2'] = 2800.00,['MGV-176'] = 1550.00,['STONER96'] = 3000.00,['CHAINSAW'] = 3000.00,['MG42'] = 2400.00,['INTERVENTION'] = 3000.00,['MODEL700'] = 2650.00,['AWS'] = 2500.00,['BFG50'] = 3000.00,['AWM'] = 3000.00,['TRG-42'] = 3000.00,['MOSINNAGANT'] = 3000.00,['DRAGUNOVSVDS'] = 2650.00,['M1903'] = 3000.00,['K14'] = 2800.00,['HECATEII'] = 3000.00,['FT300'] = 2800.00,['M107'] = 2800.00,['STEYRSCOUT'] = 3000.00,['WA2000'] = 2850.00,['NTW-20'] = 2400.00,['M9'] = 1300.00,['G17'] = 1230.00,['M1911A1'] = 830.00,['M17'] = 1200.00,['DESERTEAGLEL5'] = 1700.00,['G21'] = 810.00,['G23'] = 1025.00,['M45A1'] = 830.00,['G40'] = 1350.00,['KG-99'] = 1500.00,['G50'] = 1250.00,['FIVESEVEN'] = 2500.00,['ZIP22'] = 1600.00,['GIM1'] = 875.00,['HARDBALLER'] = 1400.00,['IZHEVSKPB'] = 950.00,['MAKAROVPM'] = 1030.00,['GB-22'] = 1900.00,['DESERTEAGLEXIX'] = 1425.00,['AUTOMAGIII'] = 1700.00,['GYROJETMARKI'] = 25.00,['GSP'] = 1800.00,['GRIZZLY'] = 1500.00,['M2011'] = 1300.00,['ALIEN'] = 1300.00,['AF2011-A1'] = 1250.00,['G18C'] = 1230.00,['93R'] = 1200.00,['PP-2000'] = 2000.00,['TEC-9'] = 1180.00,['MICROUZI'] = 2000.00,['ŠKORPIONVZ.61'] = 1200.00,['ASMI'] = 1260.00,['MP1911'] = 830.00,['ARMPISTOL'] = 2300.00,['MP412REX'] = 1700.00,['MATEBA6'] = 1450.00,['1858NEWARMY'] = 1000.00,['REDHAWK44'] = 1600.00,['JUDGE'] = 2000.00,['EXECUTIONER'] = 2000.00,['SUPERSHORTY'] = 1400.00,['SFG50'] = 2000.00,['M79THUMPER'] = 900.00,['COILGUN'] = 950.00,['SAWEDOFF'] = 1300.00,['SAIGA-12U'] = 1400.00,['OBREZ'] = 1500.00,['SASS308'] = 3000.00,['GLOCK17'] = 1230.00},
+
+    Skyboxes = {
+        ["Purple Nebula"] = {
+            ["SkyboxBk"] = "rbxassetid://159454299",
+            ["SkyboxDn"] = "rbxassetid://159454296",
+            ["SkyboxFt"] = "rbxassetid://159454293",
+            ["SkyboxLf"] = "rbxassetid://159454286",
+            ["SkyboxRt"] = "rbxassetid://159454300",
+            ["SkyboxUp"] = "rbxassetid://159454288"
+        },
+        ["Night Sky"] = {
+            ["SkyboxBk"] = "rbxassetid://12064107",
+            ["SkyboxDn"] = "rbxassetid://12064152",
+            ["SkyboxFt"] = "rbxassetid://12064121",
+            ["SkyboxLf"] = "rbxassetid://12063984",
+            ["SkyboxRt"] = "rbxassetid://12064115",
+            ["SkyboxUp"] = "rbxassetid://12064131"
+        },
+        ["Pink Daylight"] = {
+            ["SkyboxBk"] = "rbxassetid://271042516",
+            ["SkyboxDn"] = "rbxassetid://271077243",
+            ["SkyboxFt"] = "rbxassetid://271042556",
+            ["SkyboxLf"] = "rbxassetid://271042310",
+            ["SkyboxRt"] = "rbxassetid://271042467",
+            ["SkyboxUp"] = "rbxassetid://271077958"
+        },
+        ["Morning Glow"] = {
+            ["SkyboxBk"] = "rbxassetid://1417494030",
+            ["SkyboxDn"] = "rbxassetid://1417494146",
+            ["SkyboxFt"] = "rbxassetid://1417494253",
+            ["SkyboxLf"] = "rbxassetid://1417494402",
+            ["SkyboxRt"] = "rbxassetid://1417494499",
+            ["SkyboxUp"] = "rbxassetid://1417494643"
+        },
+        ["Setting Sun"] = {
+            ["SkyboxBk"] = "rbxassetid://626460377",
+            ["SkyboxDn"] = "rbxassetid://626460216",
+            ["SkyboxFt"] = "rbxassetid://626460513",
+            ["SkyboxLf"] = "rbxassetid://626473032",
+            ["SkyboxRt"] = "rbxassetid://626458639",
+            ["SkyboxUp"] = "rbxassetid://626460625"
+        },
+        ['Cache'] = {
+            ['SkyboxBk'] = 'rbxassetid://220513302';
+            ['SkyboxDn'] = 'rbxassetid://213221473';
+            ['SkyboxFt'] = 'rbxassetid://220513328';
+            ['SkyboxLf'] = 'rbxassetid://220513318';
+            ['SkyboxRt'] = 'rbxassetid://220513279';
+            ['SkyboxUp'] = 'rbxassetid://220513345';
+        },
+        ["Fade Blue"] = {
+            ["SkyboxBk"] = "rbxassetid://153695414",
+            ["SkyboxDn"] = "rbxassetid://153695352",
+            ["SkyboxFt"] = "rbxassetid://153695452",
+            ["SkyboxLf"] = "rbxassetid://153695320",
+            ["SkyboxRt"] = "rbxassetid://153695383",
+            ["SkyboxUp"] = "rbxassetid://153695471"
+        },
+        ["Elegant Morning"] = {
+            ["SkyboxBk"] = "rbxassetid://153767241",
+            ["SkyboxDn"] = "rbxassetid://153767216",
+            ["SkyboxFt"] = "rbxassetid://153767266",
+            ["SkyboxLf"] = "rbxassetid://153767200",
+            ["SkyboxRt"] = "rbxassetid://153767231",
+            ["SkyboxUp"] = "rbxassetid://153767288"
+        },
+        ["Neptune"] = {
+            ["SkyboxBk"] = "rbxassetid://218955819",
+            ["SkyboxDn"] = "rbxassetid://218953419",
+            ["SkyboxFt"] = "rbxassetid://218954524",
+            ["SkyboxLf"] = "rbxassetid://218958493",
+            ["SkyboxRt"] = "rbxassetid://218957134",
+            ["SkyboxUp"] = "rbxassetid://218950090"
+        },
+        ["Redshift"] = {
+            ["SkyboxBk"] = "rbxassetid://401664839",
+            ["SkyboxDn"] = "rbxassetid://401664862",
+            ["SkyboxFt"] = "rbxassetid://401664960",
+            ["SkyboxLf"] = "rbxassetid://401664881",
+            ["SkyboxRt"] = "rbxassetid://401664901",
+            ["SkyboxUp"] = "rbxassetid://401664936"
+        },
+        ["Aesthetic Night"] = {
+            ["SkyboxBk"] = "rbxassetid://1045964490",
+            ["SkyboxDn"] = "rbxassetid://1045964368",
+            ["SkyboxFt"] = "rbxassetid://1045964655",
+            ["SkyboxLf"] = "rbxassetid://1045964655",
+            ["SkyboxRt"] = "rbxassetid://1045964655",
+            ["SkyboxUp"] = "rbxassetid://1045962969"
+        }
+    },
+
     HitboxSizes = { -- PF Developers like to change these :) will break aimbot & esp if they do.
         ["Head"] = Vec3(1, 1, 1),
         ["Torso"] = Vec3(2, 2, 1),
@@ -3885,108 +4479,6 @@ local Storage = {
         ["LeftLeg"] = Vec3(1, 2, 1),
         ["RightLeg"] = Vec3(1, 2, 1)
     },
-
-    Skyboxes = {
-		["Purple Nebula"] = {
-			["SkyboxBk"] = "rbxassetid://159454299",
-			["SkyboxDn"] = "rbxassetid://159454296",
-			["SkyboxFt"] = "rbxassetid://159454293",
-			["SkyboxLf"] = "rbxassetid://159454286",
-			["SkyboxRt"] = "rbxassetid://159454300",
-			["SkyboxUp"] = "rbxassetid://159454288"
-		},
-		["Night Sky"] = {
-			["SkyboxBk"] = "rbxassetid://12064107",
-			["SkyboxDn"] = "rbxassetid://12064152",
-			["SkyboxFt"] = "rbxassetid://12064121",
-			["SkyboxLf"] = "rbxassetid://12063984",
-			["SkyboxRt"] = "rbxassetid://12064115",
-			["SkyboxUp"] = "rbxassetid://12064131"
-		},
-		["Pink Daylight"] = {
-			["SkyboxBk"] = "rbxassetid://271042516",
-			["SkyboxDn"] = "rbxassetid://271077243",
-			["SkyboxFt"] = "rbxassetid://271042556",
-			["SkyboxLf"] = "rbxassetid://271042310",
-			["SkyboxRt"] = "rbxassetid://271042467",
-			["SkyboxUp"] = "rbxassetid://271077958"
-		},
-		["Morning Glow"] = {
-			["SkyboxBk"] = "rbxassetid://1417494030",
-			["SkyboxDn"] = "rbxassetid://1417494146",
-			["SkyboxFt"] = "rbxassetid://1417494253",
-			["SkyboxLf"] = "rbxassetid://1417494402",
-			["SkyboxRt"] = "rbxassetid://1417494499",
-			["SkyboxUp"] = "rbxassetid://1417494643"
-		},
-		["Setting Sun"] = {
-			["SkyboxBk"] = "rbxassetid://626460377",
-			["SkyboxDn"] = "rbxassetid://626460216",
-			["SkyboxFt"] = "rbxassetid://626460513",
-			["SkyboxLf"] = "rbxassetid://626473032",
-			["SkyboxRt"] = "rbxassetid://626458639",
-			["SkyboxUp"] = "rbxassetid://626460625"
-		},
-		['Cache'] = {
-			['SkyboxBk'] = 'rbxassetid://220513302';
-			['SkyboxDn'] = 'rbxassetid://213221473';
-			['SkyboxFt'] = 'rbxassetid://220513328';
-			['SkyboxLf'] = 'rbxassetid://220513318';
-			['SkyboxRt'] = 'rbxassetid://220513279';
-			['SkyboxUp'] = 'rbxassetid://220513345';
-		},
-		["Fade Blue"] = {
-			["SkyboxBk"] = "rbxassetid://153695414",
-			["SkyboxDn"] = "rbxassetid://153695352",
-			["SkyboxFt"] = "rbxassetid://153695452",
-			["SkyboxLf"] = "rbxassetid://153695320",
-			["SkyboxRt"] = "rbxassetid://153695383",
-			["SkyboxUp"] = "rbxassetid://153695471"
-		},
-		["Elegant Morning"] = {
-			["SkyboxBk"] = "rbxassetid://153767241",
-			["SkyboxDn"] = "rbxassetid://153767216",
-			["SkyboxFt"] = "rbxassetid://153767266",
-			["SkyboxLf"] = "rbxassetid://153767200",
-			["SkyboxRt"] = "rbxassetid://153767231",
-			["SkyboxUp"] = "rbxassetid://153767288"
-		},
-		["Neptune"] = {
-			["SkyboxBk"] = "rbxassetid://218955819",
-			["SkyboxDn"] = "rbxassetid://218953419",
-			["SkyboxFt"] = "rbxassetid://218954524",
-			["SkyboxLf"] = "rbxassetid://218958493",
-			["SkyboxRt"] = "rbxassetid://218957134",
-			["SkyboxUp"] = "rbxassetid://218950090"
-		},
-		["Redshift"] = {
-			["SkyboxBk"] = "rbxassetid://401664839",
-			["SkyboxDn"] = "rbxassetid://401664862",
-			["SkyboxFt"] = "rbxassetid://401664960",
-			["SkyboxLf"] = "rbxassetid://401664881",
-			["SkyboxRt"] = "rbxassetid://401664901",
-			["SkyboxUp"] = "rbxassetid://401664936"
-		},
-		["Aesthetic Night"] = {
-			["SkyboxBk"] = "rbxassetid://1045964490",
-			["SkyboxDn"] = "rbxassetid://1045964368",
-			["SkyboxFt"] = "rbxassetid://1045964655",
-			["SkyboxLf"] = "rbxassetid://1045964655",
-			["SkyboxRt"] = "rbxassetid://1045964655",
-			["SkyboxUp"] = "rbxassetid://1045962969"
-		}
-	},
-
-    Textures = {
-		["Groove"] = "rbxassetid://10785404176",
-		["Cloud"] = "rbxassetid://5176277457",
-		["Sky"] = "rbxassetid://1494603972",
-		["Smudge"] = "rbxassetid://6096634060",
-		["Scrapes"] = "rbxassetid://6248583558",
-		["Galaxy"] = "rbxassetid://1120738433",
-		["Stars"] = "rbxassetid://598201818",
-		["Rainbow"] = "rbxassetid://10037165803"
-	},
 
     PartMaterials = {
         "Plastic", "Wood", "Slate",
@@ -4008,6 +4500,8 @@ local Storage = {
 
     NextRagebotShot = tick(),
     TargetWithinFOV = false,
+    AutoFireClick = false,
+    AimbotFiring = false,
 
     ArePacketsChoked = false,
     FakeLagDistance = 0,
@@ -4015,1463 +4509,1256 @@ local Storage = {
     LastTickChoked = {
         Position = Vec3(),
         Tick = tick()
-    },
-
-    DrawList = {}
-}
-
-local Renderer = {}
-
-function Renderer:FindExistingShape(name)
-    local Shape = Storage.DrawList[name]
-    if Shape then
-        return Shape
-    else
-        return nil
-    end
-end
-
-function Renderer:Unrender(name)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = false
-        Shape:Remove()
-        Storage.DrawList[name] = nil
-    end
-end
-
-function Renderer:UnrenderAll(excludes)
-    for Name, Shape in pairs(Storage.DrawList) do
-        local shouldExclude = false
-        
-        for _, Exclude in ipairs(excludes) do
-            if Exclude == Name then
-                shouldExclude = true
-                break
-            end
-        end
-        
-        if not shouldExclude then
-            Shape.Visible = false
-            Shape:Remove()
-        end
-    end
-
-    for _, Exclude in ipairs(excludes) do
-        local shapeToKeep = Storage.DrawList[Exclude]
-        Storage.DrawList = {}
-        if shapeToKeep then
-            Storage.DrawList[Exclude] = shapeToKeep
-        end
-    end
-end
-
-function Renderer:Rectangle(name, position, size, color)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Size = size
-        Shape.Color = color
-        Shape.Transparency = 1
-        Shape.Filled = false
-    else
-        Shape = Drawing.new("Square")
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Size = size
-        Shape.Color = color
-        Shape.Transparency = 1
-        Shape.Filled = false
-        
-        Storage.DrawList[name] = Shape
-    end
-    
-    return Shape
-end
-
-function Renderer:FilledRectangle(name, position, size, color)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Size = size
-        Shape.Color = color
-        Shape.Transparency = 1
-    else
-        Shape = Drawing.new("Square")
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Size = size
-        Shape.Color = color
-        Shape.Transparency = 1
-        
-        Storage.DrawList[name] = Shape
-    end
-    
-    return Shape
-end
-
-function Renderer:Circle(name, position, radius, color)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Radius = radius
-        Shape.Color = color
-        Shape.Transparency = 1
-        Shape.Filled = false
-    else
-        Shape = Drawing.new("Circle")
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Radius = radius
-        Shape.Color = color
-        Shape.Transparency = 1
-        Shape.Filled = false
-        
-        Storage.DrawList[name] = Shape
-    end
-    
-    return Shape
-end
-
-function Renderer:FilledCircle(name, position, radius, color)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Radius = radius
-        Shape.Color = color
-        Shape.Transparency = 1
-    else
-        Shape = Drawing.new("Circle")
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Radius = radius
-        Shape.Color = color
-        Shape.Transparency = 1
-        
-        Storage.DrawList[name] = Shape
-    end
-    
-    return Shape
-end
-
-function Renderer:Line(name, from, to, color, thickness)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = true
-        Shape.From = from
-        Shape.To = to
-        Shape.Color = color
-        Shape.Thickness = thickness
-        Shape.Transparency = 1
-    else
-        Shape = Drawing.new("Line")
-        Shape.Visible = true
-        Shape.From = from
-        Shape.To = to
-        Shape.Color = color
-        Shape.Thickness = thickness
-        Shape.Transparency = 1
-        
-        Storage.DrawList[name] = Shape
-    end
-    
-    return Shape
-end
-
-function Renderer:Text(name, position, text, color, size, font)
-    local Shape = self:FindExistingShape(name)
-    
-    if Shape then
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Text = text
-        Shape.Color = color
-        Shape.Size = size
-        Shape.Font = font
-        Shape.Transparency = 1
-    else
-        Shape = Drawing.new("Text")
-        Shape.Visible = true
-        Shape.Position = position
-        Shape.Text = text
-        Shape.Color = color
-        Shape.Size = size
-        Shape.Font = font
-        Shape.Transparency = 1
-        
-        Storage.DrawList[name] = Shape
-    end
-    
-    return Shape
-end
-
--- Active developers: @fuckuneedthisfor & @distinguished_1
-
--- Script Info:
--- Script date, Project created (6/13/2024 : 5:18 PM)
--- Script name: Redacted-project (placeholder)
--- Script description: Phantom Forces Rage/Legit cheat
-
--- Additional Info:
--- This project is a script for Phantom Forces, designed to enhance gameplay with both legit and rage features
--- Performance based project in both framerate and capability to keep up with competitors like MoonLight, Eclipse.lol, DeleteMob
-
--- MENU-BEGIN -----------------------------------------------------------------------------------------
-local Window = Library:CreateWindow({
-    Title = 'Redacted-project ( ' .. Redacted.Username .. (Redacted.Developer and ', beta )' or ' )'),
-    Center = true, AutoShow = true, TabPadding = 15, MenuFadeTime = 0.2
-})
-
-local Tabs = {
-    RagebotTab = Window:AddTab('Ragebot'),
-    AntiaimTab = Window:AddTab('Anti-aim'),
-    VisualsTab = Window:AddTab('Visuals'),
-    MiscTab = Window:AddTab('Miscellaneous'),
-    SettingsTab = Window:AddTab('Settings')
-}
-
-local Groups = {
-    Ragebot = {
-        General = Tabs.RagebotTab:AddLeftGroupbox('General'),
-        Other = Tabs.RagebotTab:AddRightGroupbox('Other')
-    },
-
-    AntiAim = {
-        General = Tabs.AntiaimTab:AddLeftGroupbox('General'),
-        FakeLag = Tabs.AntiaimTab:AddRightGroupbox('FakeLag'),
-        Other = Tabs.AntiaimTab:AddRightGroupbox('Other')
-    },
-
-    Visuals = {
-        Players = Tabs.VisualsTab:AddLeftGroupbox('Players'),
-        World = Tabs.VisualsTab:AddRightGroupbox('World'),
-
-        Throwables = Tabs.VisualsTab:AddLeftGroupbox('Throwables'),
-        Other = Tabs.VisualsTab:AddRightGroupbox('Other')
-    },
-
-    Misc = {
-        Movement = Tabs.MiscTab:AddLeftGroupbox('Movement'),
-        Other = Tabs.MiscTab:AddRightGroupbox('Other')
-    },
-
-    Settings = {
-        Menu = Tabs.SettingsTab:AddLeftGroupbox(Redacted.Developer and 'Menu / Developer' or 'Menu')
-        -- Another is added by the SaveManager 'Configuration' later on.
     }
 }
 
--- MENU VARIABLES (RAGEBOT)
-Groups.Ragebot.General:AddToggle('RagebotEnabled', {
-    Text = 'Aimbot', Tooltip = nil,
-    Default = false,
+-- UI/Menu Creation
+    local Window = Library:CreateWindow({
+        Title = 'Redacted-project ( ' .. Redacted.Username .. ", " .. Redacted.Build .. ' )',
+        Center = true, AutoShow = true, TabPadding = 15, MenuFadeTime = 0.2
+    })
 
-    Callback = function(Value)
-        Config.Ragebot.General.Enabled = Value
+    local Tabs = {
+        Ragebot = Window:AddTab('Ragebot'),
+        Antiaim = Window:AddTab('Anti-aim'),
+        Visuals = Window:AddTab('Visuals'),
+        Misc = Window:AddTab('Miscellaneous'),
+        Settings = Window:AddTab('Settings')
+    }
+
+    local Groups = {
+        Ragebot = {
+            General = Tabs.Ragebot:AddLeftGroupbox('General'),
+            Other = Tabs.Ragebot:AddRightGroupbox('Other')
+        },
+
+        Antiaim = {
+            General = Tabs.Antiaim:AddLeftGroupbox('General'),
+            Fakelag = Tabs.Antiaim:AddRightGroupbox('Fakelag'),
+            Other = Tabs.Antiaim:AddRightGroupbox('Other')
+        },
+
+        Visuals = {
+            Players = Tabs.Visuals:AddLeftGroupbox('Players'),
+            World = Tabs.Visuals:AddRightGroupbox('World'),
+
+            Throwables = Tabs.Visuals:AddLeftGroupbox('Throwables'),
+            Other = Tabs.Visuals:AddRightGroupbox('Other')
+        },
+
+        Misc = {
+            Movement = Tabs.Misc:AddLeftGroupbox('Movement'),
+            Other = Tabs.Misc:AddRightGroupbox('Other')
+        },
+
+        Settings = {
+            Menu = Tabs.Settings:AddLeftGroupbox(OverrideUserSettings and 'Menu / Developer' or 'Menu')
+            -- 'Configuration' Is added later on by the SaveManager.
+        }
+    }
+
+    -- UI -> Ragebot -> General
+    Groups.Ragebot.General:AddToggle('RagebotEnabled', {
+        Text = 'Aimbot', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Ragebot.General.Enabled = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddDropdown('RagebotFieldOfViewMode', {
+        Text = 'Field of view mode', Tooltip = nil,
+
+        Values = {'Circle', 'Angle'},
+        Multi = false,
+        Default = 2,
+
+        Callback = function(Value)
+            Config.Ragebot.General.FieldOfViewMode = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddSlider('RagebotFieldOfView', {
+        Text = 'Field of view', Tooltip = 'Maximum angle the aimbot is allowed for activation',
+
+        Default = 360, Min = 0, Max = 360, Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Ragebot.General.FieldOfView = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddDropdown('RagebotTargetSelection', {
+        Text = 'Target selection', Tooltip = nil,
+
+        Values = {'Crosshair', 'Distance', 'Health', 'Damage'},
+        Multi = false,
+        Default = 1,
+
+        Callback = function(Value)
+            Config.Ragebot.General.TargetSelection = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddToggle('RagebotAutoWall', {
+        Text = 'Auto wall', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Ragebot.General.AutoWall = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddToggle('RagebotAutoShoot', {
+        Text = 'Auto shoot', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Ragebot.General.AutoFire = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddDropdown('RagebotHitboxes', {
+        Text = 'Hitboxes', Tooltip = 'Which hitboxes the aimbot will target',
+
+        Values = {'Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg'},
+        Multi = true,
+        Default = 0,
+
+        Callback = function(Value)
+            Config.Ragebot.General.Hitboxes = Value
+        end
+    })
+
+    -- UI -> Antiaim -> General
+    Groups.Antiaim.General:AddToggle('AntiAimEnabled', {
+        Text = 'Enabled',
+        Tooltip = nil,
+
+        Default = false,
+
+        Callback = function(Value)
+            Config.Antiaim.General.Enabled = Value
+        end
+    })
+
+    -- UI -> Antiaim -> Fakelag
+    Groups.Antiaim.Fakelag:AddToggle('Fakelag', {
+        Text = 'Enabled ( experimental! )',
+        Tooltip = nil,
+
+        Default = false,
+
+        Callback = function(Value)
+            Config.Antiaim.FakeLag.Enabled = Value
+        end
+    })
+
+    Groups.Antiaim.Fakelag:AddSlider('FakelagMinDistance', {
+        Text = 'Minimum range',
+        Tooltip = nil,
+
+        Default = 20, 
+        Min = 1, 
+        Max = 40,
+
+        Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Antiaim.FakeLag.MinDistance = Value
+        end
+    })
+
+    Groups.Antiaim.Fakelag:AddSlider('FakelagMaxDistance', {
+        Text = 'Maximum range',
+        Tooltip = nil,
+
+        Default = 30, 
+        Min = 1, 
+        Max = 40,
+
+        Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Antiaim.FakeLag.MaxDistance = Value
+        end
+    })
+
+    -- UI -> Visuals -> Players
+    Groups.Visuals.Players:AddToggle('Boxes', {
+        Text = 'Boxes', Tooltip = nil,
+
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.Players.Boxes.Enabled = Value
+        end
+    }):AddColorPicker('BoxesColor', {
+        Title = 'Boxes color',
+        
+        Default = ColorRGB(255, 255, 255),
+        Transparency = 0,
+
+        Callback = function(Value, Transparency)
+            Config.Visuals.Players.Boxes.Color = Value
+        end
+    })
+
+    Groups.Visuals.Players:AddToggle('Chams', {
+        Text = 'Chams', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.Players.Chams.Enabled = Value
+        end
+    }):AddColorPicker('ChamsOutlineColor', {
+        Title = 'Outline color',
+
+        Default = Redacted.Accent,
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.Players.Chams.OutlineColor = Value
+        end
+    }):AddColorPicker('ChamsFillColor', {
+        Title = 'Fill color',
+
+        Default = ColorRGB(0, 0, 0),
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.Players.Chams.FillColor = Value
+        end
+    })
+
+    Groups.Visuals.Players:AddToggle('WeaponChams', {
+        Text = 'Weapon chams', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.Players.WeaponChams.Enabled = Value
+        end
+    }):AddColorPicker('WeaponChamsColor', {
+        Title = 'Color',
+
+        Default = Redacted.Accent,
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.Players.WeaponChams.Color = Value
+        end
+    })
+
+    Groups.Visuals.Players:AddDropdown('WeaponChamsMaterial', {
+        Text = 'Weapon material', Tooltip = nil,
+
+        Values = Storage.PartMaterials,
+        Multi = false,
+        Default = 'ForceField',
+
+        Callback = function(Value)
+            Config.Visuals.Players.WeaponChams.Material = Value
+        end
+    })
+
+    Groups.Visuals.Players:AddToggle('ArmChams', {
+        Text = 'Arm chams',
+        Tooltip = nil,
+
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.Players.ArmChams.Enabled = Value
+        end
+    }):AddColorPicker('ArmChamsColor', {
+        Title = 'Color',
+        Transparency = 0,
+
+        Default = Redacted.Accent,
+        
+        Callback = function(Value)
+            Config.Visuals.Players.ArmChams.Color = Value
+        end
+    })
+
+    Groups.Visuals.Players:AddDropdown('ArmChamsMaterial', {
+        Text = 'Arms material',
+        Tooltip = nil,
+
+        Values = Storage.PartMaterials,
+        Multi = false,
+        Default = 'ForceField',
+
+        Callback = function(Value)
+            Config.Visuals.Players.ArmChams.Material = Value
+        end
+    })
+
+    -- UI -> Visuals -> World
+    Groups.Visuals.World:AddDropdown('OverrideTechnology', {
+        Text = 'Override lighting', Tooltip = nil,
+
+        Values = {'Compatibility', 'Future', 'Legacy', 'ShadowMap', 'Voxel'},
+        Multi = false,
+        Default = 'Compatibility',
+
+        Callback = function(Value)
+            Config.Visuals.World.OverrideTechnology = Value
+        end
+    })
+
+    Groups.Visuals.World:AddToggle('MirrorWorld', {
+        Text = 'Mirror world', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.World.MirrorWorld = Value
+        end
+    })
+
+    Groups.Visuals.World:AddToggle('NightMode', {
+        Text = 'Nightmode', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.World.NightMode = Value
+        end
+    })
+
+    Groups.Visuals.World:AddToggle('AmbientLighting', {
+        Text = 'Ambient lighting', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.World.OverrideAmbient.Enabled = Value
+        end
+    }):AddColorPicker('AmbientLightingColor', {
+        Title = 'Override ambient',
+
+        Default = Redacted.Accent,
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.World.OverrideAmbient.Color = Value
+        end
+    })
+
+    Groups.Visuals.World:AddToggle('SkyboxChanger', {
+        Text = 'Skybox changer', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.World.SkyboxChanger.Enabled = Value
+        end
+    })
+
+    Groups.Visuals.World:AddDropdown('SkyboxChangerTexture', {
+        Text = 'Texture', Tooltip = nil,
+
+        Values = GetTableKeys(Storage.Skyboxes), -- NOTE: Keys is a custom function.
+        Multi = false,
+        Default = 1,
+
+        Callback = function(Value)
+            Config.Visuals.World.SkyboxChanger.Value = Value
+        end
+    })
+
+    -- UI -> Visuals -> Other
+    Groups.Visuals.Other:AddToggle('Crosshair', {
+        Text = 'Crosshair', Tooltip = nil,
+        
+        Default = false,
+        
+        Callback = function(Value)
+            Config.Visuals.Other.Crosshair.Enabled = Value
+        end
+    }):AddColorPicker('CrosshairColor', {
+        Title = 'Crosshair color',
+
+        Default = ColorRGB(255, 255, 255),
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.Other.Crosshair.Color = Value
+        end
+    })
+
+    Groups.Visuals.Other:AddToggle('VisualizeFOV', {
+        Text = 'Visualise fov', Tooltip = nil,
+        
+        Default = false,
+        
+        Callback = function(Value)
+            Config.Visuals.Other.VisualizeFOV.Enabled = Value
+        end
+    }):AddColorPicker('FovInactiveColor', {
+        Title = 'Active color',
+
+        Default = ColorRGB(255, 255, 255),
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.Other.VisualizeFOV.ActiveColor = Value
+        end
+    }):AddColorPicker('FovActiveColor', {
+        Title = 'Inactive color',
+
+        Default = Redacted.Accent,
+        Transparency = 0,
+
+        Callback = function(Value)
+            Config.Visuals.Other.VisualizeFOV.InactiveColor = Value
+        end
+    })
+
+    -- MENU VARIABLES (MISCELLANEOUS)
+    Groups.Misc.Movement:AddToggle('Bhop', {
+        Text = 'Bhop', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Misc.Movement.Bhop = Value
+        end
+    })
+
+    Groups.Misc.Movement:AddToggle('FlyHack', {
+        Text = 'Flyhack', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Misc.Movement.FlyHack.Enabled = Value
+        end
+    })
+    Groups.Misc.Movement:AddSlider('FlyHackValue', {
+        Text = 'Flyhack speed', Tooltip = nil,
+
+        Default = 50,  Min = 0,  Max = 100, Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Misc.Movement.FlyHack.Value = Value
+        end
+    })
+
+    Groups.Misc.Movement:AddToggle('SpeedHack', {
+        Text = 'Speedhack', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Misc.Movement.SpeedHack.Enabled = Value
+        end
+    })
+    Groups.Misc.Movement:AddSlider('SpeedHackValue', {
+        Text = 'Speedhack speed', Tooltip = nil,
+
+        Default = 50,  Min = 0,  Max = 100, Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Misc.Movement.SpeedHack.Value = Value
+        end
+    })
+
+    Groups.Misc.Other:AddToggle('Invisibility', {
+        Text = 'Invisibility (server-side)', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Misc.Other.Invisibility = Value
+        end
+    })
+
+    Groups.Misc.Other:AddSlider('HipHeightValue', {
+        Text = 'Hip height', Tooltip = nil,
+
+        Default = 0,  Min = 0,  Max = 100, Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Misc.Other.HipHeight = Value
+        end
+    })
+
+    if OverrideUserSettings then
+        Groups.Settings.Menu:AddButton('Load DarkDex', function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+        end)
     end
-})
-
-Groups.Ragebot.General:AddDropdown('RagebotFieldOfViewMode', {
-    Text = 'Field of view mode', Tooltip = nil,
-
-    Values = {'Circle', 'Angular'},
-    Multi = false,
-    Default = 2,
-
-    Callback = function(Value)
-        Config.Ragebot.General.FieldOfViewMode = Value
-    end
-})
-
-Groups.Ragebot.General:AddSlider('RagebotFieldOfView', {
-    Text = 'Field of view', Tooltip = 'Maximum angle the aimbot is allowed for activation',
-
-    Default = 360, Min = 0, Max = 360, Rounding = 1,
-    Compact = false,
-
-    Callback = function(Value)
-        Config.Ragebot.General.FieldOfView = Value
-    end
-})
-
-Groups.Ragebot.General:AddDropdown('RagebotTargetSelection', {
-    Text = 'Target selection', Tooltip = nil,
-
-    Values = {'Crosshair', 'Distance', 'Health', 'Damage'},
-    Multi = false,
-    Default = 1,
-
-    Callback = function(Value)
-        Config.Ragebot.General.TargetSelection = Value
-    end
-})
-
-Groups.Ragebot.General:AddToggle('RagebotAutoWall', {
-    Text = 'Auto wall', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Ragebot.General.AutoWall = Value
-    end
-})
-
-Groups.Ragebot.General:AddToggle('RagebotAutoShoot', {
-    Text = 'Auto shoot', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Ragebot.General.AutoFire = Value
-    end
-})
-
-Groups.Ragebot.General:AddDropdown('RagebotHitboxes', {
-    Text = 'Hitboxes', Tooltip = 'Which hitboxes the aimbot will target',
-
-    Values = {'Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg'},
-    Multi = true,
-    Default = 0,
-
-    Callback = function(Value)
-        Config.Ragebot.General.Hitboxes = Value
-    end
-})
-
--- MENU VARIABLES (ANTIAIM)
-Groups.AntiAim.General:AddToggle('AntiAimEnabled', {
-    Text = 'Enabled',
-    Tooltip = nil,
-
-    Default = false,
-
-    Callback = function(Value)
-        Config.AntiAim.General.Enabled = Value
-    end
-})
-
-Groups.AntiAim.FakeLag:AddToggle('FakeLag', {
-    Text = 'Enabled ( experimental! )',
-    Tooltip = nil,
-
-    Default = false,
-
-    Callback = function(Value)
-        Config.AntiAim.FakeLag.Enabled = Value
-    end
-})
-
-Groups.AntiAim.FakeLag:AddSlider('FakeLagMinDistance', {
-    Text = 'Minimum range',
-    Tooltip = nil,
-
-    Default = 20, 
-    Min = 1, 
-    Max = 40,
-
-    Rounding = 1,
-    Compact = false,
-
-    Callback = function(Value)
-        Config.AntiAim.FakeLag.MinDistance = Value
-    end
-})
-
-Groups.AntiAim.FakeLag:AddSlider('FakeLagMaxDistance', {
-    Text = 'Maximum range',
-    Tooltip = nil,
-
-    Default = 30, 
-    Min = 1, 
-    Max = 40,
-
-    Rounding = 1,
-    Compact = false,
-
-    Callback = function(Value)
-        Config.AntiAim.FakeLag.MaxDistance = Value
-    end
-})
-
--- MENU VARIABLES (ESP)
-Groups.Visuals.Players:AddToggle('Boxes', {
-    Text = 'Boxes', Tooltip = nil,
-
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.Players.Boxes.Enabled = Value
-    end
-}):AddColorPicker('BoxesColor', {
-    Title = 'Boxes color',
-    
-    Default = ColorRGB(255, 255, 255),
-    Transparency = 0,
-
-    Callback = function(Value, Transparency)
-        print(Value, Transparency)
-        Config.Visuals.Players.Boxes.Color = Value
-    end
-})
-
-Groups.Visuals.Players:AddToggle('Chams', {
-    Text = 'Chams', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.Players.Chams.Enabled = Value
-    end
-}):AddColorPicker('ChamsOutlineColor', {
-    Title = 'Outline color',
-
-    Default = Redacted.Accent,
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.Players.Chams.OutlineColor = Value
-    end
-}):AddColorPicker('ChamsFillColor', {
-    Title = 'Fill color',
-
-    Default = ColorRGB(0, 0, 0),
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.Players.Chams.FillColor = Value
-    end
-})
-
-Groups.Visuals.Players:AddToggle('WeaponChams', {
-    Text = 'Weapon chams', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.Players.WeaponChams.Enabled = Value
-    end
-}):AddColorPicker('WeaponChamsColor', {
-    Title = 'Color',
-
-    Default = Redacted.Accent,
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.Players.WeaponChams.Color = Value
-    end
-})
-
-Groups.Visuals.Players:AddDropdown('WeaponChamsMaterial', {
-    Text = 'Weapon material', Tooltip = nil,
-
-    Values = Storage.PartMaterials,
-    Multi = false,
-    Default = 'ForceField',
-
-    Callback = function(Value)
-        Config.Visuals.Players.WeaponChams.Material = Value
-    end
-})
-
-Groups.Visuals.Players:AddToggle('ArmChams', {
-    Text = 'Arm chams',
-    Tooltip = nil,
-
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.Players.ArmChams.Enabled = Value
-    end
-}):AddColorPicker('ArmChamsColor', {
-    Title = 'Color',
-    Transparency = 0,
-
-    Default = Redacted.Accent,
-    
-    Callback = function(Value)
-        Config.Visuals.Players.ArmChams.Color = Value
-    end
-})
-
-Groups.Visuals.Players:AddDropdown('ArmChamsMaterial', {
-    Text = 'Arms material',
-    Tooltip = nil,
-
-    Values = Storage.PartMaterials,
-    Multi = false,
-    Default = 'ForceField',
-
-    Callback = function(Value)
-        Config.Visuals.Players.ArmChams.Material = Value
-    end
-})
-
-Groups.Visuals.World:AddDropdown('OverrideTechnology', {
-    Text = 'Override lighting', Tooltip = nil,
-
-    Values = {'Compatibility', 'Future', 'Legacy', 'ShadowMap', 'Voxel'},
-    Multi = false,
-    Default = 'Compatibility',
-
-    Callback = function(Value)
-        Config.Visuals.World.OverrideTechnology = Value
-    end
-})
-
-Groups.Visuals.World:AddToggle('MirrorWorld', {
-    Text = 'Mirror world', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.World.MirrorWorld = Value
-    end
-})
-
-Groups.Visuals.World:AddToggle('NightMode', {
-    Text = 'Nightmode', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.World.NightMode = Value
-    end
-})
-
-Groups.Visuals.World:AddToggle('AmbientLighting', {
-    Text = 'Ambient lighting', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.World.OverrideAmbient.Enabled = Value
-    end
-}):AddColorPicker('AmbientLightingColor', {
-    Title = 'Override ambient',
-
-    Default = Redacted.Accent,
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.World.OverrideAmbient.Color = Value
-    end
-})
-
-Groups.Visuals.World:AddToggle('SkyboxChanger', {
-    Text = 'Skybox changer', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Visuals.World.SkyboxChanger.Enabled = Value
-    end
-})
-
-local SkyboxNames = {}
-for name, _ in pairs(Storage.Skyboxes) do
-    table.insert(SkyboxNames, name)
-end
-
-Groups.Visuals.World:AddDropdown('SkyboxChangerTexture', {
-    Text = 'Texture', Tooltip = nil,
-
-    Values = SkyboxNames,
-    Multi = false,
-    Default = 1, -- Nebula
-
-    Callback = function(Value)
-        Config.Visuals.World.SkyboxChanger.Value = Value
-    end
-})
-
-Groups.Visuals.Other:AddToggle('Crosshair', {
-    Text = 'Crosshair', Tooltip = nil,
-    
-    Default = false,
-    
-    Callback = function(Value)
-        Config.Visuals.Other.Crosshair.Enabled = Value
-    end
-}):AddColorPicker('CrosshairColor', {
-    Title = 'Crosshair color',
-
-    Default = ColorRGB(255, 255, 255),
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.Other.Crosshair.Color = Value
-    end
-})
-
-Groups.Visuals.Other:AddToggle('VisualizeFOV', {
-    Text = 'Visualise fov', Tooltip = nil,
-    
-    Default = false,
-    
-    Callback = function(Value)
-        Config.Visuals.Other.VisualizeFOV.Enabled = Value
-    end
-}):AddColorPicker('FovInactiveColor', {
-    Title = 'Active color',
-
-    Default = ColorRGB(255, 255, 255),
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.Other.VisualizeFOV.ActiveColor = Value
-    end
-}):AddColorPicker('FovActiveColor', {
-    Title = 'Inactive color',
-
-    Default = Redacted.Accent,
-    Transparency = 0,
-
-    Callback = function(Value)
-        Config.Visuals.Other.VisualizeFOV.InactiveColor = Value
-    end
-})
-
--- MENU VARIABLES (MISCELLANEOUS)
-Groups.Misc.Movement:AddToggle('Bhop', {
-    Text = 'Bhop', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Misc.Movement.Bhop = Value
-    end
-})
-
-Groups.Misc.Movement:AddToggle('FlyHack', {
-    Text = 'Flyhack', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Misc.Movement.FlyHack.Enabled = Value
-    end
-})
-Groups.Misc.Movement:AddSlider('FlyHackValue', {
-    Text = 'Flyhack speed', Tooltip = nil,
-
-    Default = 50,  Min = 0,  Max = 100, Rounding = 1,
-    Compact = false,
-
-    Callback = function(Value)
-        Config.Misc.Movement.FlyHack.Value = Value
-    end
-})
-
-Groups.Misc.Movement:AddToggle('SpeedHack', {
-    Text = 'Speedhack', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Misc.Movement.SpeedHack.Enabled = Value
-    end
-})
-Groups.Misc.Movement:AddSlider('SpeedHackValue', {
-    Text = 'Speedhack speed', Tooltip = nil,
-
-    Default = 50,  Min = 0,  Max = 100, Rounding = 1,
-    Compact = false,
-
-    Callback = function(Value)
-        Config.Misc.Movement.SpeedHack.Value = Value
-    end
-})
-
-Groups.Misc.Other:AddToggle('Invisibility', {
-    Text = 'Invisibility (server-side)', Tooltip = nil,
-    Default = false,
-
-    Callback = function(Value)
-        Config.Misc.Other.Invisibility = Value
-    end
-})
-
-Groups.Misc.Other:AddSlider('HipHeightValue', {
-    Text = 'Hip height', Tooltip = nil,
-
-    Default = 0,  Min = 0,  Max = 100, Rounding = 1,
-    Compact = false,
-
-    Callback = function(Value)
-        Config.Misc.Other.HipHeight = Value
-    end
-})
-
-if Redacted.Developer then
-    Groups.Settings.Menu:AddButton('Load DarkDex', function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
-    end)
-end
+--
 
 -- Skip Misc->Configuration, Handled at EOF because of unload function.
 -- Now lets get into the juicy part of this code mf, 1/2 of this was written while in a zaza induced coma, AND RN AHHH
 
-local PhantomForces = {}
+-- Features -> Phantom Forces (Getters, Setters, etc)
+    local PhantomForces = {}
 
--- Returns the tip of the muzzle for our weapon, used for silent aimbot & autowall
-function PhantomForces:GetMuzzleParts(Gun)
-    local Muzzle = {}
+    -- This is only used for pointing the muzzle torwards our ragebot target.
+    function PhantomForces:MakeObjectLookAt(Model, TargetParts, HitboxPosition)
+        for i, Part in ipairs(Model:GetChildren()) do
+            local Joints = Part:GetJoints()
 
-    for _, Part in pairs(Gun:GetChildren()) do
-        if Part.Name == 'Flame' or Part.Name == 'SightMark' or Part.Name == 'FlameSUP' then
-            table.insert(Muzzle, Part)
+            if Joints ~= nil then
+                for _, PartName in pairs(TargetParts) do
+                    if Part.Name == PartName then
+                        Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
+                    end
+                end
+            end
         end
     end
 
-    return Muzzle
-end
+    -- Returns the muzzle tip to our viewmodel weapon, bullets fire from this position so we use this for aimbot currently.
+    function PhantomForces:GetMuzzleParts(Gun)
+        local Muzzle = {}
 
-function PhantomForces:GetPlayerModels()
-    local PlayerList = {}
-
-    for i,Teams in Workspace.Players:GetChildren() do
-        for i, Players in Teams:GetChildren() do
-            table.insert(PlayerList, Players)
+        for _, Part in pairs(Gun:GetChildren()) do
+            if Part.Name == 'SightMark' or Part.Name == 'FlameSUP' or Part.Name == 'Flame' then
+                table.insert(Muzzle, Part)
+            end
         end
+
+        return Muzzle
     end
 
-    return PlayerList
-end
+    -- Returns Phantom Forces custom player models, The name variable is string encrypted under everything so don't even bother changing this.
+    function PhantomForces:GetPlayerModels()
+        local PlayerList = {}
 
--- All parts of Worspace.Players is str encrypted by pf faggy devs, go kys @litozinnamon & @Shay.
-function PhantomForces:GetPlayerTeam(Player)
-    local Helmet = Player:FindFirstChildWhichIsA("Folder"):FindFirstChildOfClass("MeshPart")
-    
-    if Helmet then
-        if Helmet.BrickColor == BrickColor.new("Black") then
-            return game.Teams.Phantoms
-        else
-            return game.Teams.Ghosts
+        for i,Teams in Workspace.Players:GetChildren() do
+            for i, Players in Teams:GetChildren() do
+                table.insert(PlayerList, Players)
+            end
         end
+
+        return PlayerList
     end
-end
 
-function PhantomForces:FindPartBySize(Target, Size, Leg)
-    local IsLeg = Leg -- this is retarded asf but both legs & arms are the same size, there is no way to tell the apart.
-
-    for _, Child in ipairs(Target:GetChildren()) do
-        if Child:IsA("BasePart") and Child.Size == Size then
-            if IsLeg then
-                IsLeg = false
+    -- @litozinnamon & @Shay yall should go kys, I hate doing this fucking retarded bs it makes the code look stupid. yall doing this didn't prevent SHITTTTTT.
+    function PhantomForces:GetPlayerTeam(Player)
+        local Helmet = Player:FindFirstChildWhichIsA("Folder"):FindFirstChildOfClass("MeshPart")
+        
+        if Helmet then
+            if Helmet.BrickColor == BrickColor.new("Black") then
+                return game.Teams.Phantoms
             else
+                return game.Teams.Ghosts
+            end
+        end
+    end
+
+    function PhantomForces:FindPartBySize(Target, Size)
+        -- Since the Arms and Legs have the same hitbox size, theres not really a way to tell them apart.
+        -- Phantom forces developers also like to encrypt anything under Workspace.Players, ex: Name for a player is a random string not an actual name.
+        -- Problem here is the leg and arm hitboxes ["Head"] = Vec3(1, 1, 1), ["Torso"] = Vec3(2, 2, 1), ["LeftArm"] = Vec3(1, 2, 1), ["RightArm"] = Vec3(1, 2, 1), ["LeftLeg"] = Vec3(1, 2, 1), ["RightLeg"] = Vec3(1, 2, 1)
+        -- There is no way to tell them apart, im too fucked up rn to fix this lmfaoooooo.
+
+        local RepeatHitboxes = {}
+
+        for _, Child in ipairs(Target:GetChildren()) do
+            if Child:IsA("BasePart") and Child.Size == Size then
                 return Child
             end
         end
+
+        return nil
     end
 
-    return nil
-end
+    function PhantomForces:GetPlayerPart(Target, PartName)
+        for HitboxName, HitboxSize in pairs(Storage.HitboxSizes) do
+            local Part = PhantomForces:FindPartBySize(Target, HitboxSize)
 
-function PhantomForces:GetPlayerPart(Target, PartName)
-    for HitboxName, HitboxSize in pairs(Storage.HitboxSizes) do
-        local IsLeg = (HitboxName == "LeftLeg" or HitboxName == "RightLeg")
-        local Part = PhantomForces:FindPartBySize(Target, HitboxSize, IsLeg)
-
-        if Part and Part:IsA("BasePart") and PartName == HitboxName then
-            return Part
-        end
-    end
-
-    return nil
-end
-
-function PhantomForces:GetPlayerParts(Target, CheckConfig)
-    -- Move 'CheckConfig' to Ragebot, ts dumb but also helps with not getting unnecessary parts in turn increasing performance.
-    local Hitboxes = {}
-
-    for HitboxName, HitboxSize in pairs(Storage.HitboxSizes) do
-        if not CheckConfig or Config.Ragebot.General.Hitboxes[HitboxName] then
-            -- Check if we should skip the first match
-            local IsLeg = (HitboxName == "LeftLeg" or HitboxName == "RightLeg")
-            local Part = PhantomForces:FindPartBySize(Target, HitboxSize, IsLeg)
-
-            if Part and Part:IsA("BasePart") then
-                Hitboxes[HitboxName] = Part
-            end
-        end
-    end
-
-    return Hitboxes
-end
-
--- PhantomForces -> LocalPlayer -> ...
-PhantomForces.LocalPlayer = {}
-
-function PhantomForces.LocalPlayer:IsAlive()
-	return Workspace.Ignore:FindFirstChild("RefPlayer")
-end
-
-function PhantomForces.LocalPlayer:GetArms()
-    local ArmsModel = {}
-
-    for i, Viewmodel in ipairs(Camera:GetChildren()) do
-        if Viewmodel:IsA("Model") and Viewmodel.Name:match("Arm") then
-            table.insert(ArmsModel, Viewmodel)
-        end
-    end
-
-    return ArmsModel
-end
-
-function PhantomForces.LocalPlayer:GetGun()
-    local GunModel = nil
-
-    for i, Viewmodel in ipairs(Camera:GetChildren()) do
-        if Viewmodel:IsA("Model") and not Viewmodel.Name:match("Arm") then
-            GunModel = Viewmodel
-            break
-        end
-    end
-    
-    return GunModel
-end
-
--- MISC
-local Misc = {}
-
-function Misc:Run()
-    if not PhantomForces.LocalPlayer:IsAlive() then
-        return
-    end
-
-    local PlayerModel = Workspace.Ignore:FindFirstChild("RefPlayer")
-
-    if not PlayerModel then
-        --[[if self.newroot then
-            self.newroot:Destroy()
-            self.newroot = nil
-        end]]
-        
-        return
-    end
-
-    local Humanoid = PlayerModel:FindFirstChildOfClass("Humanoid")
-    local RootPart = PlayerModel:FindFirstChild("HumanoidRootPart")
-
-    --[[if RootPart then
-        RootPart.Anchored = false
-        self.oldroot = RootPart
-
-        if not self.newroot then
-            local Copy = RootPart:Clone()
-            Copy.Parent = PlayerModel
-            self.newroot = Copy
-        else
-            self.newroot.CFrame = RootPart.CFrame
-            self.newroot.AssemblyLinearVelocity = RootPart.AssemblyLinearVelocity
-            self.newroot.AssemblyAngularVelocity = RootPart.AssemblyAngularVelocity
-            self.newroot.CanCollide = false
-
-            self.oldroot.CanCollide = false
-        end
-    end]]
-
-    if Config.Misc.Movement.FlyHack.Enabled then
-        local LookVector = Camera.CFrame.LookVector
-        local Direction = Vec3()
-
-        local Directions = {
-            [Enum.KeyCode.W] = LookVector,
-            [Enum.KeyCode.A] = Vec3(LookVector.Z, 0, -LookVector.X),
-            [Enum.KeyCode.S] = -LookVector,
-            [Enum.KeyCode.D] = Vec3(-LookVector.Z, 0, LookVector.X),
-            [Enum.KeyCode.LeftControl] = Vec3(0, -5, 0),
-            [Enum.KeyCode.LeftShift] = Vec3(0, -5, 0),
-            [Enum.KeyCode.Space] = Vec3(0, 5, 0)
-        }
-
-        for Key, Dir in pairs(Directions) do
-            if UserInputService:IsKeyDown(Key) then
-                Direction = Direction + Dir
+            if Part and Part:IsA("BasePart") and PartName == HitboxName then
+                return Part
             end
         end
 
-        if Direction.Magnitude > 0 then
-            RootPart.Velocity = Direction.Unit * Config.Misc.Movement.FlyHack.Value
-            RootPart.Anchored = false
-        else
-            RootPart.Velocity = Vec3()
-            RootPart.Anchored = true
-        end
+        return nil
     end
 
-    if PlayerModel ~= nil and Config.Misc.Movement.SpeedHack.Enabled and not Config.Misc.Movement.FlyHack.Enabled and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-        local LookVector = Camera.CFrame.LookVector
-        local Direction = Vec3()
+    function PhantomForces:GetPlayerParts(Target, CheckConfig)
+        -- Move 'CheckConfig' to Ragebot, ts dumb but also helps with not getting unnecessary parts in turn increasing performance.
+        local Hitboxes = {}
 
-        local Directions = {
-            [Enum.KeyCode.W] = Vec3(LookVector.X, 0, LookVector.Z),
-            [Enum.KeyCode.A] = Vec3(LookVector.Z, 0, -LookVector.X),
-            [Enum.KeyCode.S] = -Vec3(LookVector.X, 0, LookVector.Z),
-            [Enum.KeyCode.D] = Vec3(-LookVector.Z, 0, LookVector.X)
-        }
+        for HitboxName, HitboxSize in pairs(Storage.HitboxSizes) do
+            if not CheckConfig or Config.Ragebot.General.Hitboxes[HitboxName] then
+                -- Check if we should skip the first match
+                local Part = PhantomForces:FindPartBySize(Target, HitboxSize)
 
-        for Key, Dir in pairs(Directions) do
-            if UserInputService:IsKeyDown(Key) then
-                Direction = Direction + Dir
-            end
-        end
-
-        if Direction.Magnitude > 0 then
-            RootPart.Velocity = Direction.Unit * Config.Misc.Movement.SpeedHack.Value + Vec3(0, RootPart.Velocity.Y, 0)
-        end
-    end
-
-    if Config.Misc.Movement.Bhop and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-        Humanoid.Jump = true
-    end
-
-    Humanoid.HipHeight = Config.Misc.Other.HipHeight
-end
-
--- VISUALS
-local Visuals = {}
-
-function Visuals:Run()
-    local PlayerModels = PhantomForces:GetPlayerModels()
-
-    if Config.Visuals.Players.Boxes.Enabled and PlayerModels then
-        Renderer:UnrenderAll({'FOVCircle'})
-
-        for _, Player in pairs(PlayerModels) do
-            if not Player:FindFirstChild("Dead") then
-                local Torso = PhantomForces:GetPlayerPart(Player, 'Torso')
-                
-                if Torso then
-                    local ScreenPosition, OnScreen = Camera:WorldToViewportPoint(Torso.Position)
-    
-                    if OnScreen and tostring(PhantomForces:GetPlayerTeam(Player)) ~= Players.LocalPlayer.Team.Name then
-                        local Scale = 1000 / (Camera.CFrame.Position - Torso.Position).Magnitude * 80 / Camera.FieldOfView
-                        
-                        local BoundingBox, Size = Player:GetBoundingBox()
-
-                        Renderer:Rectangle(
-                            Player.Name .. "_Box",
-                            ScreenPosition - (Size * (Scale / 2)),
-                            Size * Scale,
-                            Config.Visuals.Players.Boxes.Color
-                        )
-                    end
+                if Part and Part:IsA("BasePart") then
+                    Hitboxes[HitboxName] = Part
                 end
             end
         end
-    else
-        Renderer:UnrenderAll({'FOVCircle'})
+
+        return Hitboxes
     end
 
-    if Config.Visuals.Other.Crosshair.Enabled then
-        Renderer:Line(
-            "CrosshairVertical",
-            Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 - 10),
-            Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + 10),
-            Config.Visuals.Other.Crosshair.Color,
-            2
-        )
-        Renderer:Line(
-            "CrosshairHorizontal",
-            Vec2(Camera.ViewportSize.X / 2 - 10, Camera.ViewportSize.Y / 2),
-            Vec2(Camera.ViewportSize.X / 2 + 10, Camera.ViewportSize.Y / 2),
-            Config.Visuals.Other.Crosshair.Color,
-            2
-        )
-    else
-        Renderer:Unrender("CrosshairVertical")
-        Renderer:Unrender("CrosshairHorizontal")
+    -- PhantomForces -> LocalPlayer -> ...
+    PhantomForces.LocalPlayer = {}
+
+    function PhantomForces.LocalPlayer:IsAlive()
+        return Workspace.Ignore:FindFirstChild("RefPlayer")
     end
 
-    if Config.Visuals.Other.VisualizeFOV.Enabled then
-        local MousePosition = UserInputService:GetMouseLocation()
+    function PhantomForces.LocalPlayer:GetArms()
+        local ArmsModel = {}
 
-        Renderer:FilledCircle("FOVCircle",
-            Vec2(MousePosition.X, MousePosition.Y), Config.Ragebot.General.FieldOfView,
-            (Storage.TargetWithinFOV and Config.Visuals.Other.VisualizeFOV.ActiveColor or Config.Visuals.Other.VisualizeFOV.InactiveColor)
-        )
-    else
-        Renderer:Unrender("FOVCircle")
-    end
-
-    if Config.Visuals.World.OverrideAmbient.Enabled and Lighting then
-        if not Storage.WorldAmbientsOriginal then
-            Storage.WorldAmbientsOriginal = {
-                ['Ambient'] = Lighting['Ambient'],
-                ['OutdoorAmbient'] = Lighting["OutdoorAmbient"],
-                ['ColorShift_Top'] = Lighting["ColorShift_Top"],
-                ['ColorShift_Bottom'] = Lighting["ColorShift_Bottom"]
-            }
-        end
-
-        Lighting["Ambient"]           = Config.Visuals.World.OverrideAmbient.Color
-        Lighting["OutdoorAmbient"]    = Config.Visuals.World.OverrideAmbient.Color
-        Lighting["ColorShift_Top"]    = Config.Visuals.World.OverrideAmbient.Color
-        Lighting["ColorShift_Bottom"] = Config.Visuals.World.OverrideAmbient.Color
-
-    elseif Storage.WorldAmbientsOriginal then
-        for name, v in pairs(Storage.WorldAmbientsOriginal) do
-            Lighting[name] = v
-        end
-    end
-
-    local Sky = Lighting:FindFirstChildOfClass("Sky")
-
-    if Config.Visuals.World.SkyboxChanger.Enabled and Sky then
-        if not Storage.SkyboxOriginal then
-            Storage.SkyboxOriginal = Sky
-        end
-
-        for _, v in pairs(Storage.Skyboxes[Config.Visuals.World.SkyboxChanger.Value]) do
-            if Sky[_] ~= v then
-                Sky[_] = v
+        for i, Viewmodel in ipairs(Camera:GetChildren()) do
+            if Viewmodel:IsA("Model") and Viewmodel.Name:match("Arm") then
+                table.insert(ArmsModel, Viewmodel)
             end
         end
-    elseif Storage.SkyboxOriginal then
-        Sky = Storage.SkyboxOriginal
+
+        return ArmsModel
     end
 
-    Lighting.Technology = Config.Visuals.World.OverrideTechnology
-    Lighting.Brightness = Config.Visuals.World.NightMode and 0.01 or 1
+    function PhantomForces.LocalPlayer:GetGun()
+        local GunModel = nil
 
-    if Config.Visuals.World.MirrorWorld then
-        for _, v in pairs(Workspace.Map.MapParts) do
-            if v:IsA("Part") then
-                v.Reflectance = 1
+        for i, Viewmodel in ipairs(Camera:GetChildren()) do
+            if Viewmodel:IsA("Model") and not Viewmodel.Name:match("Arm") then
+                GunModel = Viewmodel
+                break
             end
         end
-    else
         
+        return GunModel
     end
-end
+--
 
--- CHAMS
-local Chams = {}
+-- Features -> Misc
+    local Misc = {}
 
-function Chams:CreateBackup(Model, PartType)
-    local Backup = {}
-
-    for _, Part in ipairs(Model:GetChildren()) do
-        if Part:IsA(PartType) then
-            Backup[Part.Name] = {
-                Transparency = Part.Transparency,
-                Material = Part.Material,
-                Color = Part.Color
-            }
+    function Misc:Run()
+        if not PhantomForces.LocalPlayer:IsAlive() then
+            return
         end
-    end
-    
-    return Backup
-end
 
-function Chams:RestoreChams(Model, Original)
-    if not Model or not Original then
-        return
-    end
+        local PlayerModel = Workspace.Ignore:FindFirstChild("RefPlayer")
 
-    for _, Part in ipairs(Model:GetChildren()) do
-        local OriginalPart = Original[Part.Name]
-
-        if OriginalPart then
-            Part.Transparency = OriginalPart.Transparency
-            Part.Material = OriginalPart.Material
-            Part.Color = OriginalPart.Color
-        end
-    end
-end
-
-function Chams:ApplyChams(Model, ExcludeParts, DestroyParts, Material, Color)
-    if not Model then
-        return
-    end
-
-    for _, Part in ipairs(Model:GetChildren()) do
-        if table.find(DestroyParts, Part.Name) then
-            Part:Destroy()
-        elseif not table.find(ExcludeParts, Part.Name) and Part:IsA("BasePart") then
-            if Part.Transparency < 1 then
-                Part.Transparency = 0
-            end
-
-            if ObjectHasProperty(Part, "UsePartColor") then
-                Part.UsePartColor = true
-            end
+        if not PlayerModel then
+            --[[if self.newroot then
+                self.newroot:Destroy()
+                self.newroot = nil
+            end]]
             
-            Part.Material = Material
-            Part.Color = Color
+            return
         end
+
+        local Humanoid = PlayerModel:FindFirstChildOfClass("Humanoid")
+        local RootPart = PlayerModel:FindFirstChild("HumanoidRootPart")
+
+        --[[if RootPart then
+            RootPart.Anchored = false
+            self.oldroot = RootPart
+
+            if not self.newroot then
+                local Copy = RootPart:Clone()
+                Copy.Parent = PlayerModel
+                self.newroot = Copy
+            else
+                self.newroot.CFrame = RootPart.CFrame
+                self.newroot.AssemblyLinearVelocity = RootPart.AssemblyLinearVelocity
+                self.newroot.AssemblyAngularVelocity = RootPart.AssemblyAngularVelocity
+                self.newroot.CanCollide = false
+
+                self.oldroot.CanCollide = false
+            end
+        end]]
+
+        if Config.Misc.Movement.FlyHack.Enabled then
+            local LookVector = Camera.CFrame.LookVector
+            local Direction = Vec3()
+
+            local Directions = {
+                [Enum.KeyCode.W] = LookVector,
+                [Enum.KeyCode.A] = Vec3(LookVector.Z, 0, -LookVector.X),
+                [Enum.KeyCode.S] = -LookVector,
+                [Enum.KeyCode.D] = Vec3(-LookVector.Z, 0, LookVector.X),
+                [Enum.KeyCode.LeftControl] = Vec3(0, -5, 0),
+                [Enum.KeyCode.LeftShift] = Vec3(0, -5, 0),
+                [Enum.KeyCode.Space] = Vec3(0, 5, 0)
+            }
+
+            for Key, Dir in pairs(Directions) do
+                if UserInputService:IsKeyDown(Key) then
+                    Direction = Direction + Dir
+                end
+            end
+
+            if Direction.Magnitude > 0 then
+                RootPart.Velocity = Direction.Unit * Config.Misc.Movement.FlyHack.Value
+                RootPart.Anchored = false
+            else
+                RootPart.Velocity = Vec3()
+                RootPart.Anchored = true
+            end
+        end
+
+        if PlayerModel ~= nil and Config.Misc.Movement.SpeedHack.Enabled and not Config.Misc.Movement.FlyHack.Enabled and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            local LookVector = Camera.CFrame.LookVector
+            local Direction = Vec3()
+
+            local Directions = {
+                [Enum.KeyCode.W] = Vec3(LookVector.X, 0, LookVector.Z),
+                [Enum.KeyCode.A] = Vec3(LookVector.Z, 0, -LookVector.X),
+                [Enum.KeyCode.S] = -Vec3(LookVector.X, 0, LookVector.Z),
+                [Enum.KeyCode.D] = Vec3(-LookVector.Z, 0, LookVector.X)
+            }
+
+            for Key, Dir in pairs(Directions) do
+                if UserInputService:IsKeyDown(Key) then
+                    Direction = Direction + Dir
+                end
+            end
+
+            if Direction.Magnitude > 0 then
+                RootPart.Velocity = Direction.Unit * Config.Misc.Movement.SpeedHack.Value + Vec3(0, RootPart.Velocity.Y, 0)
+            end
+        end
+
+        if Config.Misc.Movement.Bhop and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            Humanoid.Jump = true
+        end
+
+        Humanoid.HipHeight = Config.Misc.Other.HipHeight
     end
-end
+--
 
-function Chams:Run()
-    local PlayerModels, Arms, Gun = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetArms(), PhantomForces.LocalPlayer:GetGun()
+-- Features -> Visuals
+    local Visuals = {}
 
-    if PlayerModels and #PlayerModels > 0 then
-        for i, Player in PlayerModels do
-            if Player then
-                -- CHAMS
-                local Highlight = Player:FindFirstChildOfClass("Highlight")
+    function Visuals:Update()
+        local PlayerModels = PhantomForces:GetPlayerModels()
 
-                if Config.Visuals.Players.Chams.Enabled and not tostring(Player:GetFullName()):find(tostring(Workspace.Ignore.DeadBody)) and tostring(PhantomForces:GetPlayerTeam(Player)) ~= Players.LocalPlayer.Team.Name then
-                    if not Highlight then
-                        Highlight = Instance.new("Highlight", Player)
-                    end
+        if Config.Visuals.Players.Boxes.Enabled and PlayerModels ~= nil then
+            Renderer:UnrenderAllExcept({'FOVCircle', 'CrosshairHorizontal', 'CrosshairVertical'})
 
-                    Highlight.Enabled = true
-                    Highlight.Adornee = Player
-                    Highlight.FillColor = Config.Visuals.Players.Chams.FillColor
-                    Highlight.OutlineColor = Config.Visuals.Players.Chams.OutlineColor
+            for _, Player in pairs(PlayerModels) do
+                if not Player:FindFirstChild("Dead") then
+                    local Torso = PhantomForces:GetPlayerPart(Player, "Torso")
                     
-                    Highlight.FillTransparency = nil
-                    Highlight.OutlineTransparency = nil
-                    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                elseif not Config.Visuals.Players.Chams.Enabled and Highlight then
-                    Highlight:Destroy()
-                end
-            end
-        end
-    end
+                    if Torso then
+                        local ScreenPosition, OnScreen = Camera:WorldToViewportPoint(Torso.Position)
+        
+                        if OnScreen and tostring(PhantomForces:GetPlayerTeam(Player)) ~= Players.LocalPlayer.Team.Name then
+                            local Scale = 1000 / (Camera.CFrame.Position - Torso.Position).Magnitude * 80 / Camera.FieldOfView
+                            
+                            local BoundingBox, Size = Player:GetBoundingBox()
 
-    if Gun then
-        if Config.Visuals.Players.WeaponChams.Enabled then
-            if not Storage.GunOriginal[Gun.Name] then
-                Storage.GunOriginal[Gun.Name] = Chams:CreateBackup(Gun, 'BasePart')
-            end
-
-            Chams:ApplyChams(
-                Gun, {'Lens', 'SightMark'}, {'Texture'},
-                Config.Visuals.Players.WeaponChams.Material,
-                Config.Visuals.Players.WeaponChams.Color
-            )
-        elseif Storage.GunOriginal[Gun.Name] then
-            Chams:RestoreChams(Gun, Storage.GunOriginal[Gun.Name])
-            Storage.GunOriginal[Gun.Name] = nil
-        end
-    end 
-    
-    if Arms then
-        if Config.Visuals.Players.ArmChams.Enabled then
-            for _, Arm in ipairs(Arms) do
-                if not Storage.ArmsOriginal[Arm.Name] then
-                    Storage.ArmsOriginal[Arm.Name] = Chams:CreateBackup(Arm, 'MeshPart')
+                            Renderer:Rectangle(
+                                Player.Name .. "_Box",
+                                ScreenPosition - (Size * (Scale / 2)),
+                                Size * Scale,
+                                Config.Visuals.Players.Boxes.Color
+                            )
+                        end
+                    end
                 end
-    
-                Chams:ApplyChams(
-                    Arm, {}, {'Sleeves'},
-                    Config.Visuals.Players.ArmChams.Material,
-                    Config.Visuals.Players.ArmChams.Color
-                )
             end
         else
-            for _, Arm in ipairs(Arms) do
-                if Storage.ArmsOriginal[Arm.Name] then
-                    Chams:RestoreChams(Arm, Storage.ArmsOriginal[Arm.Name])
-                    Storage.ArmsOriginal[Arm.Name] = nil
-                end
-            end
+            Renderer:UnrenderAllExcept({'FOVCircle', 'CrosshairHorizontal', 'CrosshairVertical'})
         end
-    end
-end
 
-local Antiaim = {}
+        if Config.Visuals.Other.Crosshair.Enabled then
+            Renderer:Line(
+                "CrosshairVertical",
+                Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 - 10),
+                Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + 10),
+                Config.Visuals.Other.Crosshair.Color,
+                2
+            )
+            Renderer:Line(
+                "CrosshairHorizontal",
+                Vec2(Camera.ViewportSize.X / 2 - 10, Camera.ViewportSize.Y / 2),
+                Vec2(Camera.ViewportSize.X / 2 + 10, Camera.ViewportSize.Y / 2),
+                Config.Visuals.Other.Crosshair.Color,
+                2
+            )
+        else
+            Renderer:Unrender({'CrosshairHorizontal', 'CrosshairVertical'})
+        end
 
--- ANTIAIM
-function Antiaim:Run()
-    if Config.AntiAim.FakeLag.Enabled then
-        if (Camera.CFrame.Position - Storage.LastTickChoked.Position).Magnitude > Storage.FakeLagDistance or tick() - Storage.LastTickChoked.Tick > 1 then
-            if Players.LocalPlayer ~= nil then
-                Storage.FakeLagDistance = math.random(Config.AntiAim.FakeLag.MinDistance, Config.AntiAim.FakeLag.MaxDistance)
-                
-                Storage.LastTickChoked = { 
-                    Position = Camera.CFrame.Position,
-                    Tick = tick()
+        if Config.Visuals.Other.VisualizeFOV.Enabled then
+            local MousePosition = UserInputService:GetMouseLocation()
+
+            Renderer:Circle("FOVCircle",
+                Vec2(MousePosition.X, MousePosition.Y), Config.Ragebot.General.FieldOfView,
+                (Storage.TargetWithinFOV and Config.Visuals.Other.VisualizeFOV.ActiveColor or Config.Visuals.Other.VisualizeFOV.InactiveColor)
+            )
+        else
+            Renderer:Unrender({'FOVCircle'})
+        end
+
+        if Config.Visuals.World.OverrideAmbient.Enabled and Lighting then
+            if not Storage.WorldAmbientsOriginal then
+                Storage.WorldAmbientsOriginal = {
+                    ['Ambient'] = Lighting['Ambient'],
+                    ['OutdoorAmbient'] = Lighting["OutdoorAmbient"],
+                    ['ColorShift_Top'] = Lighting["ColorShift_Top"],
+                    ['ColorShift_Bottom'] = Lighting["ColorShift_Bottom"]
                 }
             end
 
-            NetworkClient:SetOutgoingKBPSLimit(0)
-            Storage.ArePacketsChoked = false
+            Lighting["Ambient"]           = Config.Visuals.World.OverrideAmbient.Color
+            Lighting["OutdoorAmbient"]    = Config.Visuals.World.OverrideAmbient.Color
+            Lighting["ColorShift_Top"]    = Config.Visuals.World.OverrideAmbient.Color
+            Lighting["ColorShift_Bottom"] = Config.Visuals.World.OverrideAmbient.Color
+
+        elseif Storage.WorldAmbientsOriginal then
+            for name, v in pairs(Storage.WorldAmbientsOriginal) do
+                Lighting[name] = v
+            end
+        end
+
+        local Sky = Lighting:FindFirstChildOfClass("Sky")
+
+        if Config.Visuals.World.SkyboxChanger.Enabled and Sky then
+            if not Storage.SkyboxOriginal then
+                Storage.SkyboxOriginal = Sky
+            end
+
+            for _, v in pairs(Storage.Skyboxes[Config.Visuals.World.SkyboxChanger.Value]) do
+                if Sky[_] ~= v then
+                    Sky[_] = v
+                end
+            end
+        elseif Storage.SkyboxOriginal then
+            Sky = Storage.SkyboxOriginal
+        end
+
+        Lighting.Technology = Config.Visuals.World.OverrideTechnology
+        Lighting.Brightness = Config.Visuals.World.NightMode and 0.01 or 1
+
+        if Config.Visuals.World.MirrorWorld then
+            --[[for _, v in pairs(Workspace.Map.MapParts) do
+                if v:IsA("Part") then
+                    v.Reflectance = 1
+                end
+            end]]
         else
-            NetworkClient:SetOutgoingKBPSLimit(Storage.FakeLagDistance)
-            Storage.ArePacketsChoked = true
+            
         end
     end
-end
+--
 
-local Autowall = {}
+-- Features -> Chams
+    local Chams = {}
 
--- This will be removed in turn for actual AW, Waiting on a higher level executor.
-function Autowall:PlayerVisible(Player, Origin, End)
-    local Params = RaycastParams.new()
+    function Chams:CreateBackup(Model, PartType)
+        local Backup = {}
 
-    Params.FilterDescendantsInstances = {Player:FindFirstChildOfClass("Folder"), Workspace.Ignore, Camera}
-    Params.FilterType = Enum.RaycastFilterType.Exclude
-    Params.IgnoreWater = true
-
-    local CastRay = workspace:Raycast(Origin, End - Origin, Params)
-
-    if CastRay and CastRay.Instance and CastRay.Instance:IsDescendantOf(Player) then
-        return true
-    end
-
-    return false
-end
-
-function Autowall:CalculatePenetration(Target, Gun)
-    local WeaponName = string.gsub(string.gsub(tostring(Gun.Name), "Main", ""), " ", "")
-    local WeaponPenetratrion = Storage.PenetrationDepth[WeaponName]
-
-    -- Fix for Knife, Grenades, Etc
-    if not WeaponPenetratrion then
-        WeaponPenetratrion = 0
-    end
-
-    local Ignore = {Camera, Workspace.Ignore}
-
-    for _, Part in pairs(PhantomForces:GetMuzzleParts(Gun)) do
-        local Direction = Target.Position - Part.Position
+        for _, Part in ipairs(Model:GetChildren()) do
+            if Part:IsA(PartType) then
+                Backup[Part.Name] = {
+                    Transparency = Part.Transparency,
+                    Material = Part.Material,
+                    Color = Part.Color
+                }
+            end
+        end
         
-        local RayCastIgnore = Workspace:FindPartOnRayWithIgnoreList(
-            Ray.new(Part.Position, Direction),
-            Ignore, false, true
-        )
+        return Backup
+    end
 
-        if not RayCastIgnore then
-            return true
+    function Chams:RestoreChams(Model, Original)
+        if not Model or not Original then
+            return
         end
 
-        local Penetrated = 0
+        for _, Part in ipairs(Model:GetChildren()) do
+            local OriginalPart = Original[Part.Name]
 
-        for _, ObscuredPart in pairs(Camera:GetPartsObscuringTarget({Target.Position}, Ignore)) do
-            if ObscuredPart.CanCollide and ObscuredPart.Transparency ~= 1 and ObscuredPart.Name ~= "Window" then
-                local MaxRayLength = ObscuredPart.Size.Magnitude * Direction.Unit
+            if OriginalPart then
+                Part.Transparency = OriginalPart.Transparency
+                Part.Material = OriginalPart.Material
+                Part.Color = OriginalPart.Color
+            end
+        end
+    end
+
+    function Chams:ApplyChams(Model, ExcludeParts, DestroyParts, Material, Color)
+        if not Model then
+            return
+        end
+
+        for _, Part in pairs(Model:GetDescendants()) do
+            if table.find(DestroyParts, Part.ClassName) or table.find(DestroyParts, Part.Name) then
+                Part:Destroy()
+            end
+            if not table.find(ExcludeParts, Part.Name) and Part:IsA("BasePart") then
+                if Part.Transparency < 1 then
+                    Part.Transparency = 0
+                end
+
+                if ObjectHasProperty(Part, "UsePartColor") then
+                    Part.UsePartColor = true
+                end
                 
-                local _, Enter = game.Workspace:FindPartOnRayWithWhitelist(Ray.new(Part.Position, Direction), {ObscuredPart}, true)
-                local _, Exit = game.Workspace:FindPartOnRayWithWhitelist(Ray.new(Enter + MaxRayLength, -MaxRayLength), {ObscuredPart}, true)
-                
-                local Depth = (Exit - Enter).Magnitude;
-                
-                if Depth > WeaponPenetratrion then
-					Penetrated = Penetrated + Depth
-                    return true
+                Part.Material = Material
+                Part.Color = Color
+            end
+        end
+    end
+
+    function Chams:UpdatePlayers()
+        local PlayerModels, Arms, Gun = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetArms(), PhantomForces.LocalPlayer:GetGun()
+
+        if PlayerModels and #PlayerModels > 0 then
+            for i, Player in PlayerModels do
+                if Player then
+                    -- CHAMS
+                    local Highlight = Player:FindFirstChildOfClass("Highlight")
+
+                    if Config.Visuals.Players.Chams.Enabled and not tostring(Player:GetFullName()):find(tostring(Workspace.Ignore.DeadBody)) and tostring(PhantomForces:GetPlayerTeam(Player)) ~= Players.LocalPlayer.Team.Name then
+                        if not Highlight then
+                            Highlight = Instance.new("Highlight", Player)
+                        end
+
+                        Highlight.Enabled = true
+                        Highlight.Adornee = Player
+                        Highlight.FillColor = Config.Visuals.Players.Chams.FillColor
+                        Highlight.OutlineColor = Config.Visuals.Players.Chams.OutlineColor
+                        
+                        Highlight.FillTransparency = nil
+                        Highlight.OutlineTransparency = nil
+                        Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    elseif not Config.Visuals.Players.Chams.Enabled and Highlight then
+                        Highlight:Destroy()
+                    end
+                end
+            end
+        end
+    end
+
+    function Chams:UpdateViewmodel()
+        local Arms, Gun = PhantomForces.LocalPlayer:GetArms(), PhantomForces.LocalPlayer:GetGun()
+
+        if Gun then
+            if Config.Visuals.Players.WeaponChams.Enabled then
+                if not Storage.GunOriginal[Gun.Name] then
+                    Storage.GunOriginal[Gun.Name] = Chams:CreateBackup(Gun, 'BasePart')
+                end
+
+                Chams:ApplyChams(
+                    Gun, {'Lens', 'SightMark'}, {'Texture'},
+                    Config.Visuals.Players.WeaponChams.Material,
+                    Config.Visuals.Players.WeaponChams.Color
+                )
+            elseif Storage.GunOriginal[Gun.Name] then
+                Chams:RestoreChams(Gun, Storage.GunOriginal[Gun.Name])
+                Storage.GunOriginal[Gun.Name] = nil
+            end
+        end 
+        
+        if Arms then
+            if Config.Visuals.Players.ArmChams.Enabled then
+                for _, Arm in ipairs(Arms) do
+                    if not Storage.ArmsOriginal[Arm.Name] then
+                        Storage.ArmsOriginal[Arm.Name] = Chams:CreateBackup(Arm, 'MeshPart')
+                    end
+        
+                    Chams:ApplyChams(
+                        Arm, {}, {'Sleeves'},
+                        Config.Visuals.Players.ArmChams.Material,
+                        Config.Visuals.Players.ArmChams.Color
+                    )
                 end
             else
-                table.insert(Ignore, ObscuredPart)
+                for _, Arm in ipairs(Arms) do
+                    if Storage.ArmsOriginal[Arm.Name] then
+                        Chams:RestoreChams(Arm, Storage.ArmsOriginal[Arm.Name])
+                        Storage.ArmsOriginal[Arm.Name] = nil
+                    end
+                end
             end
         end
+    end
 
-        if Penetrated < WeaponPenetratrion then
-            print("Name:", Gun.Name, "Penetrated:", Penetrated, "WeaponPenetratrion:", WeaponPenetratrion)
-            Storage.TargetWithinFOV = true
+    function Chams:Update()
+        Chams:UpdateViewmodel()
+        Chams:UpdatePlayers()
+    end
+--
+
+-- Features -> Antiaim
+    local Antiaim = {}
+
+    function Antiaim:Run()
+        if Config.Antiaim.FakeLag.Enabled then
+            if (Camera.CFrame.Position - Storage.LastTickChoked.Position).Magnitude > Storage.FakeLagDistance or tick() - Storage.LastTickChoked.Tick > 1 then
+                if Players.LocalPlayer ~= nil then
+                    Storage.FakeLagDistance = math.random(Config.Antiaim.FakeLag.MinDistance, Config.Antiaim.FakeLag.MaxDistance)
+                    
+                    Storage.LastTickChoked = { 
+                        Position = Camera.CFrame.Position,
+                        Tick = tick()
+                    }
+                end
+
+                NetworkClient:SetOutgoingKBPSLimit(0)
+                Storage.ArePacketsChoked = false
+            else
+                NetworkClient:SetOutgoingKBPSLimit(Storage.FakeLagDistance)
+                Storage.ArePacketsChoked = true
+            end
+        end
+    end
+--
+
+-- Features -> Autowall
+    local Autowall = {}
+
+    -- This will be removed in turn for actual AW, Waiting on a higher level executor.
+    function Autowall:PlayerVisible(Player, Origin, End)
+        local Params = RaycastParams.new()
+
+        Params.FilterDescendantsInstances = {Player:FindFirstChildOfClass("Folder"), Workspace.Ignore, Camera}
+        Params.FilterType = Enum.RaycastFilterType.Exclude
+        Params.IgnoreWater = true
+
+        local CastRay = workspace:Raycast(Origin, End - Origin, Params)
+
+        if CastRay and CastRay.Instance and CastRay.Instance:IsDescendantOf(Player) then
             return true
         end
+
+        return false
     end
-end
 
--- RAGEBOT
-local Ragebot = {}
+    function Autowall:CalculatePenetration(Target, Gun)
+        local WeaponName = string.gsub(string.gsub(tostring(Gun.Name), "Main", ""), " ", "")
+        local WeaponPenetratrion = Storage.PenetrationDepth[WeaponName]
 
--- This is more of a utility than a ragebot specific feature, might wanna move it elsewhere for convience
-function Ragebot:AimWeaponAt(Gun, HitboxPosition)
-    for i, Part in ipairs(Gun:GetChildren()) do
-        local Joints = Part:GetJoints()
-
-        if Joints ~= nil then
-            if Part.Name:find("SightMark") or Part.Name:find("FlameSUP") or Part.Name:find("Flame") then
-                Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
-            end
+        -- Fix for Knife, Grenades, Etc
+        if not WeaponPenetratrion then
+            WeaponPenetratrion = 0
         end
-    end
-end
 
--- The game checks if your player distance > 5m away, if it is it client sides (magic number just guessing but yk)
-function Ragebot:SetMuzzlePosition(Gun, HitboxPosition)
-    for i, Part in ipairs(Gun:GetChildren()) do
-        local Joints = Part:GetJoints()
+        local Ignore = {Target:FindFirstChildOfClass("Folder"), Camera, Workspace.Ignore}
 
-        if Joints ~= nil then
-            if Part.Name:find("SightMark") or Part.Name:find("FlameSUP") or Part.Name:find("Flame") then
-                Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(HitboxPosition - Vector3.new(0, 0, 1)), HitboxPosition)
-            end
-        end
-    end
-end
+        for _, Part in pairs(PhantomForces:GetMuzzleParts(Gun)) do
+            local Direction = Target.Position - Part.Position
+            
+            local RayCastIgnore = Workspace:FindPartOnRayWithIgnoreList(
+                Ray.new(Part.Position, Direction),
+                Ignore, false, true
+            )
 
-function Ragebot:GetTarget(Targets, Gun)
-    local MinDistance, MinCrosshairDistance = math.huge, math.huge
-    local BestTarget = {}
-
-    for i, Target in ipairs(Targets) do
-        if Target ~= nil and tostring(PhantomForces:GetPlayerTeam(Target)) ~= Players.LocalPlayer.Team.Name then
-            local Torso = PhantomForces:GetPlayerPart(Target, 'Torso') -- Used for FOV Check (temporary ill add a hitbox sys)
-            local Parts = PhantomForces:GetPlayerParts(Target, true)
-
-            if not Torso or not Parts then 
+            if not RayCastIgnore then
                 continue
             end
 
-            local FieldOfViewMode = Config.Ragebot.General.FieldOfViewMode
+            local Penetrated = 0
 
-            if FieldOfViewMode == 'Circle' then
-                local ScreenPos = Camera:WorldToViewportPoint(Torso.Position)
-                local TargetDistance = (Vec2(Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2) - Vec2(ScreenPos.X, ScreenPos.Y)).Magnitude
-
-                if TargetDistance > Config.Ragebot.General.FieldOfView * 1.25 then
-                    continue
-                end
-            elseif FieldOfViewMode == 'Angular' then
-                local Direction = (Torso.Position - Camera.CFrame.Position).Unit
-                local DotProduct = Camera.CFrame.LookVector:Dot(Direction)
-                local Angle = math.deg(math.acos(DotProduct))
-
-                if Angle > Config.Ragebot.General.FieldOfView then
-                    continue
-                end
-            end
-
-            for _, Part in pairs(Parts) do
-                if Config.Ragebot.General.AutoWall and not Autowall:CalculatePenetration(Part, Gun) then
-                    continue
+            for _, ObscuredPart in pairs(Camera:GetPartsObscuringTarget({Target.Position}, Ignore)) do
+                if ObscuredPart.CanCollide and ObscuredPart.Transparency ~= 1 and ObscuredPart.Name ~= "Window" then
+                    local MaxRayLength = ObscuredPart.Size.Magnitude * Direction.Unit
+                    
+                    local _, Enter = game.Workspace:FindPartOnRayWithWhitelist(Ray.new(Part.Position, Direction), {ObscuredPart}, true)
+                    local _, Exit = game.Workspace:FindPartOnRayWithWhitelist(Ray.new(Enter + MaxRayLength, -MaxRayLength), {ObscuredPart}, true)
+                    
+                    local Depth = (Exit - Enter).Magnitude;
+                    
+                    if Depth > WeaponPenetratrion then
+                        Penetrated = Penetrated + Depth
+                    end
                 else
-                    if not Autowall:PlayerVisible(Target, Camera.CFrame.Position, Part.Position) then
+                    table.insert(Ignore, ObscuredPart)
+                end
+            end
+
+            if Penetrated <= WeaponPenetratrion then
+                if Storage.AimbotFiring then
+                    print("Name:", Gun.Name, "Penetrated:", Penetrated, "WeaponPenetratrion:", WeaponPenetratrion)
+                end
+
+                return true
+            end
+        end
+    end
+--
+
+-- Features -> Ragebot
+    local Ragebot = {}
+
+    function Ragebot:GetTarget(Targets, Gun)
+        local MinDistance, MinCrosshairDistance = math.huge, math.huge
+        local BestTarget = {}
+
+        for i, Target in ipairs(Targets) do
+            if Target ~= nil and tostring(PhantomForces:GetPlayerTeam(Target)) ~= Players.LocalPlayer.Team.Name then
+                local Torso = PhantomForces:GetPlayerPart(Target, "Torso") -- Used for FOV Check (temporary ill add a hitbox sys)
+                local Parts = PhantomForces:GetPlayerParts(Target, true)
+
+                if not Torso or not Parts then 
+                    continue
+                end
+
+                local FieldOfViewMode = Config.Ragebot.General.FieldOfViewMode
+
+                if FieldOfViewMode == 'Circle' then
+                    local ScreenPos = Camera:WorldToViewportPoint(Torso.Position)
+                    local ScreenMagnitude = (Vec2(Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2) - Vec2(ScreenPos.X, ScreenPos.Y)).Magnitude
+
+                    if ScreenMagnitude > Config.Ragebot.General.FieldOfView then
+                        continue
+                    end
+                elseif FieldOfViewMode == 'Angle' then
+                    local Direction = (Torso.Position - Camera.CFrame.Position).Unit
+                    local DotProduct = Camera.CFrame.LookVector:Dot(Direction)
+                    local Angle = math.deg(math.acos(DotProduct))
+
+                    if Angle > Config.Ragebot.General.FieldOfView then
                         continue
                     end
                 end
-                
-                -- Target selection: Very unattractive code I know, I will fix it.
-                -- OPTIONS: 'Cycle', 'Crosshair', 'Distance', 'Health (NOT WORKING!)', 'Damage (NOT WORKING!)'
-                local TargetSelectionConfig = Config.Ragebot.General.TargetSelection
 
-                if TargetSelectionConfig == 'Crosshair' then
-                    local ScreenPos, OnScreen = Camera:WorldToViewportPoint(Part.Position)
-                    local CrosshairDistance = (Vec2(ScreenPos.X, ScreenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                Storage.TargetWithinFOV = true
 
-                    if CrosshairDistance > MinCrosshairDistance then
+                for _, Part in pairs(Parts) do
+                    if Config.Ragebot.General.AutoWall and not Autowall:CalculatePenetration(Part, Gun) then
+                        continue
+                    elseif not Config.Ragebot.General.AutoWall and not Autowall:PlayerVisible(Target, Camera.CFrame.Position, Part.Position) then
                         continue
                     end
+                    
+                    -- {'Crosshair', 'Distance', 'Health', 'Damage'}
+                    local TargetSelectionConfig = Config.Ragebot.General.TargetSelection
 
-                    MinCrosshairDistance = CrosshairDistance
-                elseif TargetSelectionConfig == 'Distance' then
-                    local Distance = (Part.Position - Camera.CFrame.Position).Magnitude
+                    if TargetSelectionConfig == 'Crosshair' then
+                        local ScreenPos, OnScreen = Camera:WorldToViewportPoint(Part.Position)
+                        local CrosshairDistance = (Vec2(ScreenPos.X, ScreenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
 
-                    if Distance >= MinDistance then
-                        continue
+                        if CrosshairDistance > MinCrosshairDistance then
+                            continue
+                        end
+
+                        MinCrosshairDistance = CrosshairDistance
+                    elseif TargetSelectionConfig == 'Distance' then
+                        local Distance = (Part.Position - Camera.CFrame.Position).Magnitude
+
+                        if Distance >= MinDistance then
+                            continue
+                        end
+
+                        MinDistance = Distance
+                    elseif TargetSelectionConfig == 'Health' then
+                        -- This target selection option cannot be used yet because we need to find a way to retrieve player health, names, etc.
+                    elseif TargetSelectionConfig == 'Damage' then
+                        -- This target selection optiion also cannot be used because we don't have support to get access to weapon modules yet.
                     end
 
-                    MinDistance = Distance
-                elseif TargetSelectionConfig == 'Health' then
-                    -- This target selection option cannot be used yet because we need to find a way to retrieve player health, names, etc.
-                elseif TargetSelectionConfig == 'Damage' then
-                    -- This target selection optiion also cannot be used because we don't have support to get access to weapon modules yet.
+                    -- Update our target information, found a more optimal target
+                    BestTarget = {
+                        AimPoint = Part.Position,
+                        Target = Target
+                    }
                 end
+            end
+        end
 
-                -- Update our target information, found a more optimal target
-                BestTarget = {
-                    AimPoint = Part.Position,
-                    Target = Target
-                }
+        return BestTarget
+    end
+
+    function Ragebot:Run()
+        Storage.TargetWithinFOV, Storage.AimbotFiring = false, false
+
+        if not Config.Ragebot.General.Enabled or not PhantomForces.LocalPlayer:IsAlive() then
+            return
+        end
+
+        local PlayerModels, Gun = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetGun()
+
+        if not Storage.ArePacketsChoked and PlayerModels ~= nil and Gun ~= nil then
+            local Target = Ragebot:GetTarget(PlayerModels, Gun)
+            
+            if next(Target) then
+                PhantomForces:MakeObjectLookAt(Gun, {'SightMark', 'FlameSUP', 'Flame'}, Target.AimPoint)
+
+                if Config.Ragebot.General.AutoFire then
+                    Storage.AimbotFiring = true
+                end
             end
         end
     end
 
-    return BestTarget
-end
+    -- Automatic fire, This will be recoded once we have a better executor.
+    game:GetService("RunService").RenderStepped:Connect(function()
+        local ScreenCenter = Camera.ViewportSize / 2
 
-local GhettoAutofire = false
-
-task.spawn(function()
-    while task.wait() do
-        if Config.Ragebot.General.Enabled and PhantomForces.LocalPlayer:IsAlive() and GhettoAutofire then
-            local ClickPosition = Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-            if Config.Ragebot.General.AutoFire then
-                VirtualInputManager:SendMouseButtonEvent(ClickPosition.X, ClickPosition.Y, 0, true, game, 0)
-                task.wait()
-                VirtualInputManager:SendMouseButtonEvent(ClickPosition.X, ClickPosition.Y, 0, false, game, 0)
+        if Config.Ragebot.General.Enabled and PhantomForces.LocalPlayer:IsAlive() and Storage.AimbotFiring then
+            if Config.Ragebot.General.AutoFire and not Storage.AutoFireClick then
+                VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, true, game, 0)
+                Storage.AutoFireClick = true
             end
+        elseif Storage.AutoFireClick then
+            VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, false, game, 0)
+            Storage.AutoFireClick = false
         end
-    end
-end)
+    end)
+--
 
-function Ragebot:Run()
-    Storage.TargetWithinFOV = false
-    GhettoAutofire = false
-
-    if not Config.Ragebot.General.Enabled or not PhantomForces.LocalPlayer:IsAlive() then
+-- Main feature loop
+game:GetService("RunService").RenderStepped:Connect(function()
+    if Library.Unloaded then
         return
     end
 
-    local PlayerModels, Gun = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetGun()
+    Ragebot:Run()
+    Visuals:Update()
+    Chams:Update()
+    Misc:Run()
+end)
 
-    if not Storage.ArePacketsChoked and PlayerModels ~= nil and Gun ~= nil --[[and tick() > Storage.NextRagebotShot]] then
-        local Target = Ragebot:GetTarget(PlayerModels, Gun)
-        
-        if next(Target) ~= nil then
-            Ragebot:AimWeaponAt( Gun, Target.AimPoint )
+-- Signal change detections
+    Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+        Storage.ScreenSize = Camera.ViewportSize
 
-            if Config.Ragebot.General.AutoFire then
-                GhettoAutofire = true
-            end
+        local MousePosition = UserInputService:GetMouseLocation()
+
+        Renderer:FindExistingShape("FOVCircle").Position = Vec2(MousePosition.X, MousePosition.Y)
+    end)
+
+    Lighting:GetPropertyChangedSignal("Ambient"):Connect(function()
+        if Config.Visuals.World.OverrideAmbient.Enabled then
+            Lighting["Ambient"] = Config.Visuals.World.OverrideAmbient.Color
         end
+    end)
 
-        -- Lock aimbot logic and prevent from running until we can fire another round again.
-        --[[local FireRate = GetCurrentWeapon():getWeaponStat("firerate")
-        Storage.NextRagebotShot = tick() + (60 / FireRate)]]
-    end
-end
-
--- This is optimized asf (the functions themselves) 1 thread can run everything no lag.
-task.spawn(function()
-    while task.wait() do
-        Ragebot:Run()
-        --Antiaim:Run()
-        Visuals:Run()
-        Chams:Run()
-        Misc:Run()
-
-        if Library.Unloaded then
-            break
+    Lighting:GetPropertyChangedSignal("OutdoorAmbient"):Connect(function()
+        if Config.Visuals.World.OverrideAmbient.Enabled then
+            Lighting["OutdoorAmbient"] = Config.Visuals.World.OverrideAmbient.Color
         end
-    end
-end)
+    end)
 
-Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    Storage.ScreenSize = Camera.ViewportSize
+    Lighting:GetPropertyChangedSignal("ColorShift_Top"):Connect(function()
+        if Config.Visuals.World.OverrideAmbient.Enabled then
+            Lighting["ColorShift_Top"] = Config.Visuals.World.OverrideAmbient.Color
+        end
+    end)
 
-    local MousePosition = UserInputService:GetMouseLocation()
+    Lighting:GetPropertyChangedSignal("ColorShift_Bottom"):Connect(function()
+        if Config.Visuals.World.OverrideAmbient.Enabled then
+            Lighting["ColorShift_Bottom"] = Config.Visuals.World.OverrideAmbient.Color
+        end
+    end)
+--
 
-    Renderer:FindExistingShape("FOVCircle").Position = Vec2(MousePosition.X, MousePosition.Y)
-end)
+-- Unload feature
+    Groups.Settings.Menu:AddButton('Unload', function()
+        -- Removed for now, I couldnt care enough cuz 1/2 the time you need to relauch anyways.
+        -- Add back before public/private release, we havent decided either yet also.
+    end)
+--
 
-Lighting:GetPropertyChangedSignal("Ambient"):Connect(function()
-    if Config.Visuals.World.OverrideAmbient.Enabled then
-        Lighting["Ambient"] = Config.Visuals.World.OverrideAmbient.Color
-    end
-end)
-
-Lighting:GetPropertyChangedSignal("OutdoorAmbient"):Connect(function()
-    if Config.Visuals.World.OverrideAmbient.Enabled then
-        Lighting["OutdoorAmbient"] = Config.Visuals.World.OverrideAmbient.Color
-    end
-end)
-
-Lighting:GetPropertyChangedSignal("ColorShift_Top"):Connect(function()
-    if Config.Visuals.World.OverrideAmbient.Enabled then
-        Lighting["ColorShift_Top"] = Config.Visuals.World.OverrideAmbient.Color
-    end
-end)
-
-Lighting:GetPropertyChangedSignal("ColorShift_Bottom"):Connect(function()
-    if Config.Visuals.World.OverrideAmbient.Enabled then
-        Lighting["ColorShift_Bottom"] = Config.Visuals.World.OverrideAmbient.Color
-    end
-end)
-
-Groups.Settings.Menu:AddButton('Unload', function()
-    -- Removed for now, I couldnt care enough cuz 1/2 the time you need to relauch anyways.
-    -- Add back before public/private release, we havent decided either yet also.
-end)
-
--- Load UI Library save manager / config manager
+-- Load UI Library Save Manager / Config Manager.
+-- This isnt indented like everything else due to a solara bug, your script won't run with a comment on the last line.
 SaveManager:SetLibrary(Library)
 
 SaveManager:IgnoreThemeSettings()
@@ -5479,6 +5766,8 @@ SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
 
 SaveManager:SetFolder('RedactedProject')
 
-SaveManager:BuildConfigSection(Tabs.SettingsTab)
+SaveManager:BuildConfigSection(Tabs.Settings)
 
 SaveManager:LoadAutoloadConfig()
+
+Library:Notify(string.format('[RedactedProject] Script loaded, Welcome %q!', Redacted.Username))
