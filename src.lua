@@ -26,27 +26,14 @@ local Redacted = {
     Accent = Color3.fromRGB(140, 130, 255)
 }
 
--- PF game encryption fix
-local function FindInstanceByClassname(classname)
-    local Instances = game:GetChildren()
-
-    for _, Instance in ipairs(Instances) do
-        if Instance.ClassName == classname then
-            return Instance
-        end
-    end
-
-    return nil
-end
-
--- UI Library 
-    local InputService = FindInstanceByClassname('UserInputService');
-    local TextService = FindInstanceByClassname('TextService');
-    local CoreGui = FindInstanceByClassname('CoreGui');
-    local Teams = FindInstanceByClassname('Teams');
-    local Players = FindInstanceByClassname('Players');
-    local RunService = FindInstanceByClassname('RunService')
-    local TweenService = FindInstanceByClassname('TweenService');
+-- UI Library
+    local InputService = game:GetService('UserInputService');
+    local TextService = game:GetService('TextService');
+    local CoreGui = game:GetService('CoreGui');
+    local Teams = game:GetService('Teams');
+    local Players = game:GetService('Players');
+    local RunService = game:GetService('RunService')
+    local TweenService = game:GetService('TweenService');
     local RenderStepped = RunService.RenderStepped;
     local LocalPlayer = Players.LocalPlayer;
     local Mouse = LocalPlayer:GetMouse();
@@ -3670,7 +3657,7 @@ end
 
     getgenv().Library = Library
 
-    local httpService = FindInstanceByClassname('HttpService')
+    local httpService = game:GetService('HttpService')
 
     local SaveManager = {} do
         SaveManager.Folder = 'LinoriaLibSettings'
@@ -3877,6 +3864,26 @@ end
 
             section:AddDivider()
 
+            section:AddButton('Save config', function()
+                local name = Options.SaveManager_ConfigList.Value
+
+                local success, err = self:Save(name)
+                if not success then
+                    return self.Library:Notify('Failed to save config: ' .. err)
+                end
+
+                self.Library:Notify(string.format('Overwrote config %q', name))
+            end):AddButton('Load config', function()
+                local name = Options.SaveManager_ConfigList.Value
+
+                local success, err = self:Load(name)
+                if not success then
+                    return self.Library:Notify('Failed to load config: ' .. err)
+                end
+
+                self.Library:Notify(string.format('Loaded config %q', name))
+            end)
+
             section:AddButton('Create config', function()
                 local name = Options.SaveManager_ConfigName.Value
 
@@ -3893,26 +3900,6 @@ end
 
                 Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
                 Options.SaveManager_ConfigList:SetValue(nil)
-            end):AddButton('Load config', function()
-                local name = Options.SaveManager_ConfigList.Value
-
-                local success, err = self:Load(name)
-                if not success then
-                    return self.Library:Notify('Failed to load config: ' .. err)
-                end
-
-                self.Library:Notify(string.format('Loaded config %q', name))
-            end)
-
-            section:AddButton('Save config', function()
-                local name = Options.SaveManager_ConfigList.Value
-
-                local success, err = self:Save(name)
-                if not success then
-                    return self.Library:Notify('Failed to save config: ' .. err)
-                end
-
-                self.Library:Notify(string.format('Overwrote config %q', name))
             end)
 
             section:AddButton('Refresh list', function()
@@ -4174,19 +4161,19 @@ end
 --
 
 -- Get Services
-    local Teams = FindInstanceByClassname('Teams')
-    local Debris = FindInstanceByClassname("Debris")
-    local Players = FindInstanceByClassname("Players")
-    local Lighting = FindInstanceByClassname("Lighting")
-    local Workspace = FindInstanceByClassname("Workspace")
-    local RunService = FindInstanceByClassname("RunService")
-    local HttpService = FindInstanceByClassname("HttpService")
-    local NetworkClient = FindInstanceByClassname("NetworkClient")
-    local TeleportService = FindInstanceByClassname("TeleportService")
-    local UserInputService = FindInstanceByClassname("UserInputService")
-    local VirtualInputManager = FindInstanceByClassname("VirtualInputManager")
-    local MarketPlaceService = FindInstanceByClassname("MarketplaceService")
-    local ReplicatedStorage = FindInstanceByClassname("ReplicatedStorage")
+    local Teams = game:GetService('Teams')
+    local Debris = game:GetService("Debris")
+    local Players = game:GetService("Players")
+    local Lighting = game:GetService("Lighting")
+    local Workspace = game:GetService("Workspace")
+    local RunService = game:GetService("RunService")
+    local HttpService = game:GetService("HttpService")
+    local NetworkClient = game:GetService("NetworkClient")
+    local TeleportService = game:GetService("TeleportService")
+    local UserInputService = game:GetService("UserInputService")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    local MarketPlaceService = game:GetService("MarketplaceService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
 --
 
 -- Get/Create Game Vars
@@ -4624,8 +4611,7 @@ local Storage = {
     }
 
     -- UI -> Ragebot -> General [BROKEN AS OF 4TH OF JULY UPDATE, WORKING ON RECODE]
-    Groups.Ragebot.General:AddLabel("being recoded!")
-    --[[Groups.Ragebot.General:AddToggle('RagebotEnabled', {
+    Groups.Ragebot.General:AddToggle('RagebotEnabled', {
         Text = 'Aimbot', Tooltip = nil,
         Default = false,
 
@@ -4697,7 +4683,7 @@ local Storage = {
         Callback = function(Value)
             Config.Ragebot.General.Hitboxes = Value
         end
-    })]]
+    })
 
     -- UI -> Antiaim -> General
     Groups.Antiaim.General:AddToggle('AntiAimEnabled', {
@@ -4960,7 +4946,7 @@ local Storage = {
     Groups.Visuals.World:AddDropdown('SkyboxChangerTexture', {
         Text = 'Skybox', Tooltip = nil,
 
-        Values = GetTableKeys(Storage.Skyboxes), -- NOTE: Keys is a custom function.
+        Values = GetTableKeys(Storage.Skyboxes),
         Multi = false,
         Default = 1,
 
@@ -5102,18 +5088,11 @@ local Storage = {
         for _, Part in ipairs(Model:GetChildren()) do
             local Joints = Part:GetJoints()
     
-            if Joints ~= nil and Joints[1] ~= nil then
-                Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
-            end
-        end
-    end
-
-    function PhantomForces:MakePartsLookAt(Parts, HitboxPosition)
-        for _, Part in pairs(Parts) do
-            local Joints = Part:GetChildren()
-            
-            if Joints ~= nil and Joints[1] ~= nil then
-                Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
+            --We get Flame & FlameSUP with sizes now and the sightmark by detecting a SurfaceGui
+            if Joints ~= nil and #Joints > 0 then
+                if Part and (Part.Size == Vec3(0.2, 0.2, 0.2) or Part:FindFirstChildWhichIsA("SurfaceGui")) then
+                    Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
+                end
             end
         end
     end
@@ -5893,11 +5872,11 @@ local Storage = {
 
         if Config.Ragebot.General.Enabled and PhantomForces.LocalPlayer:IsAlive() and Storage.AimbotFiring then
             if Config.Ragebot.General.AutoFire and not Storage.AutoFireClick then
-                --VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, true, game, 0)
                 Storage.AutoFireClick = true
             end
         elseif Storage.AutoFireClick then
-            --VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, false, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, false, game, 0)
             Storage.AutoFireClick = false
         end
     end)
@@ -5909,7 +5888,7 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
-    --Ragebot:Run()
+    Ragebot:Run()
     Antiaim:Run()
     Visuals:Update()
     Chams:Update()
