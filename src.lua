@@ -3630,7 +3630,11 @@ local Redacted = {
         end
 
         Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
-            if Input.KeyCode == Enum.KeyCode.Insert then
+            if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
+                if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
+                    task.spawn(Library.Toggle)
+                end
+            elseif Input.KeyCode == Enum.KeyCode.Insert then
                 task.spawn(Library.Toggle)
             end
         end))
@@ -5456,7 +5460,7 @@ local Storage = {
                     Sky[_] = v
                 end
             end
-        elseif Storage.SkyboxOriginal then
+        elseif Storage.SkyboxOriginal and Sky then
             Sky:Destroy()
         
             local OriginalSky = Instance.new("Sky")
