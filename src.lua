@@ -1,5 +1,5 @@
 -- Developers only, extra debugging options.
-local OverrideUserSettings = false
+local OverrideUserSettings = true
 
 -- Active developers: @fuckuneedthisfor
 
@@ -26,14 +26,27 @@ local Redacted = {
     Accent = Color3.fromRGB(140, 130, 255)
 }
 
+-- PF game encryption fix
+local function FindInstanceByClassname(classname)
+    local Instances = game:GetChildren()
+
+    for _, Instance in ipairs(Instances) do
+        if Instance.ClassName == classname then
+            return Instance
+        end
+    end
+
+    return nil
+end
+
 -- UI Library 
-    local InputService = game:GetService('UserInputService');
-    local TextService = game:GetService('TextService');
-    local CoreGui = game:GetService('CoreGui');
-    local Teams = game:GetService('Teams');
-    local Players = game:GetService('Players');
-    local RunService = game:GetService('RunService')
-    local TweenService = game:GetService('TweenService');
+    local InputService = FindInstanceByClassname('UserInputService');
+    local TextService = FindInstanceByClassname('TextService');
+    local CoreGui = FindInstanceByClassname('CoreGui');
+    local Teams = FindInstanceByClassname('Teams');
+    local Players = FindInstanceByClassname('Players');
+    local RunService = FindInstanceByClassname('RunService')
+    local TweenService = FindInstanceByClassname('TweenService');
     local RenderStepped = RunService.RenderStepped;
     local LocalPlayer = Players.LocalPlayer;
     local Mouse = LocalPlayer:GetMouse();
@@ -3657,7 +3670,7 @@ local Redacted = {
 
     getgenv().Library = Library
 
-    local httpService = game:GetService('HttpService')
+    local httpService = FindInstanceByClassname('HttpService')
 
     local SaveManager = {} do
         SaveManager.Folder = 'LinoriaLibSettings'
@@ -4161,18 +4174,19 @@ local Redacted = {
 --
 
 -- Get Services
-    local Debris = game:GetService("Debris")
-    local Players = game:GetService("Players")
-    local Lighting = game:GetService("Lighting")
-    local Workspace = game:GetService("Workspace")
-    local RunService = game:GetService("RunService")
-    local HttpService = game:GetService("HttpService")
-    local NetworkClient = game:service("NetworkClient")
-    local TeleportService = game:GetService("TeleportService")
-    local UserInputService = game:GetService("UserInputService")
-    local VirtualInputManager = game:GetService("VirtualInputManager")
-    local MarketPlaceService = game:GetService("MarketplaceService")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Teams = FindInstanceByClassname('Teams')
+    local Debris = FindInstanceByClassname("Debris")
+    local Players = FindInstanceByClassname("Players")
+    local Lighting = FindInstanceByClassname("Lighting")
+    local Workspace = FindInstanceByClassname("Workspace")
+    local RunService = FindInstanceByClassname("RunService")
+    local HttpService = FindInstanceByClassname("HttpService")
+    local NetworkClient = FindInstanceByClassname("NetworkClient")
+    local TeleportService = FindInstanceByClassname("TeleportService")
+    local UserInputService = FindInstanceByClassname("UserInputService")
+    local VirtualInputManager = FindInstanceByClassname("VirtualInputManager")
+    local MarketPlaceService = FindInstanceByClassname("MarketplaceService")
+    local ReplicatedStorage = FindInstanceByClassname("ReplicatedStorage")
 --
 
 -- Get/Create Game Vars
@@ -4609,8 +4623,9 @@ local Storage = {
         }
     }
 
-    -- UI -> Ragebot -> General
-    Groups.Ragebot.General:AddToggle('RagebotEnabled', {
+    -- UI -> Ragebot -> General [BROKEN AS OF 4TH OF JULY UPDATE, WORKING ON RECODE]
+    Groups.Ragebot.General:AddLabel("being recoded!")
+    --[[Groups.Ragebot.General:AddToggle('RagebotEnabled', {
         Text = 'Aimbot', Tooltip = nil,
         Default = false,
 
@@ -4645,7 +4660,7 @@ local Storage = {
     Groups.Ragebot.General:AddDropdown('RagebotTargetSelection', {
         Text = 'Target selection', Tooltip = nil,
 
-        Values = {'Crosshair', 'Distance', --[['Health', 'Damage']]},
+        Values = {'Crosshair', 'Distance'},
         Multi = false,
         Default = 1,
 
@@ -4682,7 +4697,7 @@ local Storage = {
         Callback = function(Value)
             Config.Ragebot.General.Hitboxes = Value
         end
-    })
+    })]]
 
     -- UI -> Antiaim -> General
     Groups.Antiaim.General:AddToggle('AntiAimEnabled', {
@@ -5083,28 +5098,42 @@ local Storage = {
     local PhantomForces = {}
 
     -- This is only used for pointing the muzzle torwards our ragebot target.
-    function PhantomForces:MakeObjectLookAt(Model, TargetParts, HitboxPosition)
+    function PhantomForces:MakeObjectLookAt(Model, HitboxPosition)
         for _, Part in ipairs(Model:GetChildren()) do
             local Joints = Part:GetJoints()
     
-            if Joints ~= nil then
-                for i, PartName in ipairs(TargetParts) do
-                    if Part.Name:find(PartName) then
-                        Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
-                    end
-                end
+            if Joints ~= nil and Joints[1] ~= nil then
+                Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
+            end
+        end
+    end
+
+    function PhantomForces:MakePartsLookAt(Parts, HitboxPosition)
+        for _, Part in pairs(Parts) do
+            local Joints = Part:GetChildren()
+            
+            if Joints ~= nil and Joints[1] ~= nil then
+                Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
             end
         end
     end
 
     -- Returns the muzzle tip to our viewmodel weapon, bullets fire from this position so we use this for aimbot currently.
     function PhantomForces:GetMuzzleParts(Gun)
+        local Parts = Gun:GetChildren()
+    
+        local function GetDistanceFromOrigin(part)
+            return (part.Position - Vector3.new(0, 0, 0)).Magnitude
+        end
+
+        table.sort(Parts, function(a, b)
+            return GetDistanceFromOrigin(a) > GetDistanceFromOrigin(b)
+        end)
+
         local Muzzle = {}
 
-        for _, Part in pairs(Gun:GetChildren()) do
-            if Part.Name == 'SightMark' or Part.Name == 'FlameSUP' or Part.Name == 'Flame' then
-                table.insert(Muzzle, Part)
-            end
+        for i = 1, math.min(3, #Parts) do
+            table.insert(Muzzle, Parts[i])
         end
 
         return Muzzle
@@ -5129,9 +5158,9 @@ local Storage = {
         
         if Helmet then
             if Helmet.BrickColor == BrickColor.new("Black") then
-                return game.Teams.Phantoms
+                return Teams.Phantoms
             else
-                return game.Teams.Ghosts
+                return Teams.Ghosts
             end
         end
     end
@@ -5186,15 +5215,31 @@ local Storage = {
     -- PhantomForces -> LocalPlayer -> ...
     PhantomForces.LocalPlayer = {}
 
+    function PhantomForces.LocalPlayer:Get()
+        for i, Child in pairs(Workspace.Ignore:GetChildren()) do
+            if Child:IsA("Model") then
+                return Child
+            end
+        end
+
+        return nil
+    end
+
     function PhantomForces.LocalPlayer:IsAlive()
-        return Workspace.Ignore:FindFirstChild("RefPlayer")
+        for i, Child in pairs(Workspace.Ignore:GetChildren()) do
+            if Child:IsA("Model") then
+                return true
+            end
+        end
+
+        return false
     end
 
     function PhantomForces.LocalPlayer:GetArms()
         local ArmsModel = {}
 
         for i, Viewmodel in ipairs(Camera:GetChildren()) do
-            if Viewmodel:IsA("Model") and Viewmodel.Name:match("Arm") then
+            if Viewmodel and Viewmodel:IsA("Model") and Viewmodel:FindFirstChild("Arm") then
                 table.insert(ArmsModel, Viewmodel)
             end
         end
@@ -5206,7 +5251,7 @@ local Storage = {
         local GunModel = nil
 
         for i, Viewmodel in ipairs(Camera:GetChildren()) do
-            if Viewmodel:IsA("Model") and not Viewmodel.Name:match("Arm") then
+            if Viewmodel and Viewmodel:IsA("Model") and not Viewmodel:FindFirstChild("Arm") then
                 GunModel = Viewmodel
                 break
             end
@@ -5224,7 +5269,7 @@ local Storage = {
             return
         end
 
-        local PlayerModel = Workspace.Ignore:FindFirstChild("RefPlayer")
+        local PlayerModel = PhantomForces.LocalPlayer:Get()
 
         if not PlayerModel then
             --[[if self.newroot then
@@ -5350,7 +5395,7 @@ local Storage = {
     end
 
     function Visuals:UpdateFovCircle()
-        if Config.Visuals.Other.VisualizeFOV.Enabled then
+        if Config.Visuals.Other.VisualizeFOV.Enabled and PhantomForces.LocalPlayer:IsAlive() then
             local MousePosition = UserInputService:GetMouseLocation()
 
             Renderer:Circle("FOVCircle",
@@ -5363,7 +5408,7 @@ local Storage = {
     end
 
     function Visuals:UpdateCrosshair()
-        if Config.Visuals.Other.Crosshair.Enabled then
+        if Config.Visuals.Other.Crosshair.Enabled and PhantomForces.LocalPlayer:IsAlive() then
             Renderer:Line("CrosshairVertical",
                 Vec2(Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2 - 10),
                 Vec2(Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2 + 10),
@@ -5447,8 +5492,7 @@ local Storage = {
         end
     end
 
-    -- Ngl ts pasted from some script on cbro someone handed me the code over discord and I thought it was cool but Ive rewritten majority of it because it was just a 1 time load script
-    -- This needs to be recoded, it overrides materials and is kinda weird. code is also shit xuz im high AFFFF!!!!! i dont FUCKING care smd ill make it attractive when im sober
+    --Move this somewhere else, too lazy rn
     local WorldNeedsUpdate = Config.Visuals.World.OverrideWorldMaterials
 
     function Visuals:UpdateWorldMaterials()
@@ -5553,7 +5597,7 @@ local Storage = {
         end
     end
 
-    function Chams:ApplyChams(Model, ExcludeParts, DestroyParts, Material, Color)
+    function Chams:ApplyChams(Model, DestroyParts, Material, Color)
         if not Model then
             return
         end
@@ -5562,7 +5606,8 @@ local Storage = {
             if table.find(DestroyParts, Part.ClassName) or table.find(DestroyParts, Part.Name) then
                 Part:Destroy()
             end
-            if not table.find(ExcludeParts, Part.Name) and Part:IsA("BasePart") then
+            
+            if Part:IsA("BasePart") then
                 if Part.Transparency < 1 then
                     Part.Transparency = 0
                 end
@@ -5617,7 +5662,7 @@ local Storage = {
                 end
 
                 Chams:ApplyChams(
-                    Gun, {'Lens', 'SightMark'}, {'Texture'},
+                    Gun, {'Texture'},
                     Config.Visuals.Players.WeaponChams.Material,
                     Config.Visuals.Players.WeaponChams.Color
                 )
@@ -5625,7 +5670,7 @@ local Storage = {
                 Chams:RestoreChams(Gun, Storage.GunOriginal[Gun.Name])
                 Storage.GunOriginal[Gun.Name] = nil
             end
-        end 
+        end
         
         if Arms then
             if Config.Visuals.Players.ArmChams.Enabled then
@@ -5635,7 +5680,7 @@ local Storage = {
                     end
         
                     Chams:ApplyChams(
-                        Arm, {}, {'Sleeves'},
+                        Arm, {'Sleeves'},
                         Config.Visuals.Players.ArmChams.Material,
                         Config.Visuals.Players.ArmChams.Color
                     )
@@ -5827,13 +5872,13 @@ local Storage = {
             return
         end
 
-        local PlayerModels, Gun = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetGun()
+        local PlayerModels, Gun, Arms = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetGun(), PhantomForces.LocalPlayer:GetArms()
 
         if PlayerModels ~= nil and Gun ~= nil then
             local Target = Ragebot:GetTarget(PlayerModels, Gun)
             
             if next(Target) then
-                PhantomForces:MakeObjectLookAt(Gun, {'SightMark', 'FlameSUP', 'Flame'}, Target.AimPoint)
+                PhantomForces:MakeObjectLookAt(Gun, Target.AimPoint)
 
                 if Config.Ragebot.General.AutoFire then
                     Storage.AimbotFiring = true
@@ -5848,11 +5893,11 @@ local Storage = {
 
         if Config.Ragebot.General.Enabled and PhantomForces.LocalPlayer:IsAlive() and Storage.AimbotFiring then
             if Config.Ragebot.General.AutoFire and not Storage.AutoFireClick then
-                VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, true, game, 0)
+                --VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, true, game, 0)
                 Storage.AutoFireClick = true
             end
         elseif Storage.AutoFireClick then
-            VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, false, game, 0)
+            --VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, false, game, 0)
             Storage.AutoFireClick = false
         end
     end)
@@ -5864,7 +5909,7 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
-    Ragebot:Run()
+    --Ragebot:Run()
     Antiaim:Run()
     Visuals:Update()
     Chams:Update()
