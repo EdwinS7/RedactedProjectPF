@@ -1,5 +1,5 @@
 -- Developers only, extra debugging options.
-local OverrideUserSettings = true
+local OverrideUserSettings = false
 
 -- Active developers: @fuckuneedthisfor
 
