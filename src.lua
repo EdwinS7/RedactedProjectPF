@@ -5062,9 +5062,9 @@ local Storage = {
     })
 
     Groups.Settings.Menu:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
-        Text = 'Menu keybind'
+        Text = 'Menu keybind',
         Default = 'Insert', 
-        NoUI = true,
+        NoUI = true
     })
 
     Library.ToggleKeybind = Options.MenuKeybind
