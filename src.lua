@@ -1,7 +1,7 @@
 -- Developers only, extra debugging options.
 local OverrideUserSettings = true
 
--- Active developers: @fuckuneedthisfor & @distinguished_1
+-- Active developers: @fuckuneedthisfor
 
 -- Script Info:
 -- Script date, Project created (6/13/2024 : 5:18 PM)
@@ -2092,9 +2092,7 @@ local Redacted = {
             function Slider:Display()
                 local Suffix = Info.Suffix or '';
 
-                if Info.Compact then
-                    DisplayLabel.Text = Info.Text .. ': ' .. Slider.Value .. Suffix
-                elseif Info.HideMax then
+                if Info.HideMax then
                     DisplayLabel.Text = string.format('%s', Slider.Value .. Suffix)
                 else
                     DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
@@ -3893,12 +3891,12 @@ local Redacted = {
                 self.Library:Notify(string.format('Loaded config %q', name))
             end)
 
-            section:AddButton('Overwrite config', function()
+            section:AddButton('Save config', function()
                 local name = Options.SaveManager_ConfigList.Value
 
                 local success, err = self:Save(name)
                 if not success then
-                    return self.Library:Notify('Failed to overwrite config: ' .. err)
+                    return self.Library:Notify('Failed to save config: ' .. err)
                 end
 
                 self.Library:Notify(string.format('Overwrote config %q', name))
@@ -3934,7 +3932,7 @@ local Redacted = {
     local Renderer = {DrawList = {}}
 
     function Renderer:FindExistingShape(name)
-        local Shape = Renderer.DrawList[name]
+        local Shape = self.DrawList[name]
         if Shape then
             return Shape
         else
@@ -3951,23 +3949,23 @@ local Redacted = {
                 Shape:Remove()
             end
 
-            Renderer.DrawList[v] = nil
+            self.DrawList[v] = nil
         end
     end
 
     function Renderer:UnrenderAll()
-        for Name, Shape in pairs(Renderer.DrawList) do
+        for Name, Shape in pairs(self.DrawList) do
             if Shape then
                 Shape.Visible = false
                 Shape:Remove()
             end
 
-            Renderer.DrawList[v] = nil
+            self.DrawList[v] = nil
         end
     end
 
     function Renderer:UnrenderAllExcept(exclude_table)
-        for Name, Shape in pairs(Renderer.DrawList) do
+        for Name, Shape in pairs(self.DrawList) do
             local ShouldContinue = false
 
             for _, Exclude in pairs(exclude_table) do
@@ -3987,7 +3985,7 @@ local Redacted = {
                 Shape:Remove()
             end
     
-            Renderer.DrawList[Name] = nil
+            self.DrawList[Name] = nil
         end
     end
 
@@ -4010,7 +4008,7 @@ local Redacted = {
             Shape.Transparency = 1
             Shape.Filled = false
             
-            Renderer.DrawList[name] = Shape
+            self.DrawList[name] = Shape
         end
         
         return Shape
@@ -4035,7 +4033,7 @@ local Redacted = {
             Shape.Transparency = 1
             Shape.Filled = true
 
-            Renderer.DrawList[name] = Shape
+            self.DrawList[name] = Shape
         end
         
         return Shape
@@ -4060,7 +4058,7 @@ local Redacted = {
             Shape.Transparency = 1
             Shape.Filled = false
             
-            Renderer.DrawList[name] = Shape
+            self.DrawList[name] = Shape
         end
         
         return Shape
@@ -4085,7 +4083,7 @@ local Redacted = {
             Shape.Transparency = 1
             Shape.Filled = true
             
-            Renderer.DrawList[name] = Shape
+            self.DrawList[name] = Shape
         end
         
         return Shape
@@ -4110,7 +4108,7 @@ local Redacted = {
             Shape.Thickness = thickness
             Shape.Transparency = 1
             
-            Renderer.DrawList[name] = Shape
+            self.DrawList[name] = Shape
         end
         
         return Shape
@@ -4137,7 +4135,7 @@ local Redacted = {
             Shape.Font = font
             Shape.Transparency = 1
             
-            Renderer.DrawList[name] = Shape
+            self.DrawList[name] = Shape
         end
         
         return Shape
@@ -4189,15 +4187,16 @@ local Redacted = {
     local Vec3 = Vector3.new
 --
 
---[[ Get Phantom Force modules
+--[[ Get Phantom Force modules (Stolen from moonlight because this is so minimalistic)
     local Modules = {}
 
-    for _,instance in next, getnilinstances() do
+    for _, Instance in pairs(getnilinstances()) do
         if not instance:IsA("ModuleScript") then
             continue
         end
 
         local Required = nil
+        
         pcall(function()
             Required = require(instance)
         end)
@@ -4206,15 +4205,16 @@ local Redacted = {
             continue
         end
 
-        Modules[instance.Name] = Required
+        Modules[Instance.Name] = Required
     end
 
-    for _,instance in next, getloadedmodules() do
+    for _, Instance in pairs(getloadedmodules()) do
         if Modules[instance.Name] then
             continue
         end
 
         local Required = nil
+
         pcall(function()
             Required = require(instance)
         end)
@@ -4223,7 +4223,7 @@ local Redacted = {
             continue
         end
 
-        Modules[instance.Name] = Required
+        Modules[Instance.Name] = Required
     end
 
     function GetModule(name)
@@ -4283,9 +4283,7 @@ local Redacted = {
             },
 
             FakeLag = {
-                Enabled = false,
-                MinDistance = 1,
-                MaxDistance = 40
+                
             }
         },
 
@@ -4320,8 +4318,17 @@ local Redacted = {
 
             World = {
                 OverrideTechnology = 'Compatibility',
-                MirrorWorld = false,
-                NightMode = false,
+                OverrideWorldMaterials = 'Default',
+
+                OverrideClockTime = {
+                    Enabled = false,
+                    Value = 12
+                },
+
+                OverrideStarsCount = {
+                    Enabled = false,
+                    Value = 5000
+                },
             
                 OverrideAmbient = {
                     Enabled = false, 
@@ -4468,6 +4475,58 @@ local Storage = {
             ["SkyboxLf"] = "rbxassetid://1045964655",
             ["SkyboxRt"] = "rbxassetid://1045964655",
             ["SkyboxUp"] = "rbxassetid://1045962969"
+        },
+        ["Dababy"] = {
+            ["SkyboxBk"] = "rbxassetid://6083995041",
+            ["SkyboxDn"] = "rbxassetid://6083995041",
+            ["SkyboxFt"] = "rbxassetid://6083995041",
+            ["SkyboxLf"] = "rbxassetid://6083995041",
+            ["SkyboxRt"] = "rbxassetid://6083995041",
+            ["SkyboxUp"] = "rbxassetid://6083995041"
+        },
+        ["Minecraft"] = {
+            ["SkyboxBk"] = "rbxassetid://1876545003",
+            ["SkyboxDn"] = "rbxassetid://1876544331",
+            ["SkyboxFt"] = "rbxassetid://1876542941",
+            ["SkyboxLf"] = "rbxassetid://1876543392",
+            ["SkyboxRt"] = "rbxassetid://1876543764",
+            ["SkyboxUp"] = "rbxassetid://1876544642"
+        },
+        ["Deep Space Cluster"] = {
+            ["MoonTextureId"] = "rbxassetid://6444320592",
+            ["SkyboxBk"]      = "rbxassetid://6444884337",
+            ["SkyboxDn"]      = "rbxassetid://6444884785",
+            ["SkyboxFt"]      = "rbxassetid://6444884337",
+            ["SkyboxLf"]      = "rbxassetid://6444884337",
+            ["SkyboxRt"]      = "rbxassetid://6444884337",
+            ["SkyboxUp"]      = "rbxassetid://6412503613"
+        },
+        ["Oblivion Lost"] = {
+            ["MoonTextureId"] = "rbxasset://sky/moon.jpg",
+            ["SkyboxBk"]      = "rbxassetid://5103110171",
+            ["SkyboxDn"]      = "rbxassetid://5102993828",
+            ["SkyboxFt"]      = "rbxassetid://5103111020",
+            ["SkyboxLf"]      = "rbxassetid://5103112417",
+            ["SkyboxRt"]      = "rbxassetid://5103113734",
+            ["SkyboxUp"]      = "rbxassetid://5102993828"
+        }
+    },
+
+    MapMaterials = {
+        ['Minecraft'] = {
+            ['Wood'] = 3258599312,
+            ['WoodPlanks'] = 8676581022,
+            ['Brick'] = 8558400252,
+            ['Cobblestone'] = 5003953441,
+            ['Concrete'] = 7341687607,
+            ['DiamondPlate'] = 6849247561,
+            ['Fabric'] = 118776397,
+            ['Granite'] = 4722586771,
+            ['Grass'] = 4722588177,
+            ['Ice'] = 3823766459,
+            ['Marble'] = 62967586,
+            ['Metal'] = 62967586,
+            ['Sand'] = 152572215
         }
     },
 
@@ -4494,28 +4553,21 @@ local Storage = {
     ScreenSize = Camera.ViewportSize,
 
     WorldAmbientsOriginal = nil,
-    SkyboxOriginal = nil,
+    SkyboxOriginal = {},
+    WorldOriginal = {},
     ArmsOriginal = {},
     GunOriginal = {},
 
     NextRagebotShot = tick(),
     TargetWithinFOV = false,
     AutoFireClick = false,
-    AimbotFiring = false,
-
-    ArePacketsChoked = false,
-    FakeLagDistance = 0,
-    
-    LastTickChoked = {
-        Position = Vec3(),
-        Tick = tick()
-    }
+    AimbotFiring = false
 }
 
 -- UI/Menu Creation
     local Window = Library:CreateWindow({
         Title = 'Redacted-project ( ' .. Redacted.Username .. ", " .. Redacted.Build .. ' )',
-        Center = true, AutoShow = true, TabPadding = 15, MenuFadeTime = 0.2
+        Center = true, AutoShow = true, TabPadding = 5, MenuFadeTime = 0.2
     })
 
     local Tabs = {
@@ -4593,7 +4645,7 @@ local Storage = {
     Groups.Ragebot.General:AddDropdown('RagebotTargetSelection', {
         Text = 'Target selection', Tooltip = nil,
 
-        Values = {'Crosshair', 'Distance', 'Health', 'Damage'},
+        Values = {'Crosshair', 'Distance', --[['Health', 'Damage']]},
         Multi = false,
         Default = 1,
 
@@ -4645,7 +4697,7 @@ local Storage = {
     })
 
     -- UI -> Antiaim -> Fakelag
-    Groups.Antiaim.Fakelag:AddToggle('Fakelag', {
+    --[[Groups.Antiaim.Fakelag:AddToggle('Fakelag', {
         Text = 'Enabled ( experimental! )',
         Tooltip = nil,
 
@@ -4686,7 +4738,7 @@ local Storage = {
         Callback = function(Value)
             Config.Antiaim.FakeLag.MaxDistance = Value
         end
-    })
+    })]]
 
     -- UI -> Visuals -> Players
     Groups.Visuals.Players:AddToggle('Boxes', {
@@ -4811,21 +4863,55 @@ local Storage = {
         end
     })
 
-    Groups.Visuals.World:AddToggle('MirrorWorld', {
-        Text = 'Mirror world', Tooltip = nil,
-        Default = false,
+    Groups.Visuals.World:AddDropdown('OverrideWorldMaterials', {
+        Text = 'Override world materials', Tooltip = nil,
+
+        Values = {'Default', 'Minecraft'},
+        Multi = false,
+        Default = 'Default',
 
         Callback = function(Value)
-            Config.Visuals.World.MirrorWorld = Value
+            Config.Visuals.World.OverrideWorldMaterials = Value
         end
     })
 
-    Groups.Visuals.World:AddToggle('NightMode', {
-        Text = 'Nightmode', Tooltip = nil,
+    Groups.Visuals.World:AddToggle('OverrideClockTime', {
+        Text = 'Override ClockTime', Tooltip = nil,
         Default = false,
 
         Callback = function(Value)
-            Config.Visuals.World.NightMode = Value
+            Config.Visuals.World.OverrideClockTime.Enabled = Value
+        end
+    })
+
+    Groups.Visuals.World:AddSlider('OverrideClockTimeValue', {
+        Text = '', Tooltip = nil,
+
+        Default = 12,  Min = 0,  Max = 24, Rounding = 1,
+        Compact = true,
+
+        Callback = function(Value)
+            Config.Visuals.World.OverrideClockTime.Value = Value
+        end
+    })
+
+    Groups.Visuals.World:AddToggle('OverrideStarsCount', {
+        Text = 'Override stars amount', Tooltip = nil,
+        Default = false,
+
+        Callback = function(Value)
+            Config.Visuals.World.OverrideStarsCount.Enabled = Value
+        end
+    })
+
+    Groups.Visuals.World:AddSlider('StarsCountValue', {
+        Text = '', Tooltip = nil,
+
+        Default = 5000,  Min = 0,  Max = 10000, Rounding = 1,
+        Compact = true,
+
+        Callback = function(Value)
+            Config.Visuals.World.OverrideStarsCount.Value = Value
         end
     })
 
@@ -4857,7 +4943,7 @@ local Storage = {
     })
 
     Groups.Visuals.World:AddDropdown('SkyboxChangerTexture', {
-        Text = 'Texture', Tooltip = nil,
+        Text = 'Skybox', Tooltip = nil,
 
         Values = GetTableKeys(Storage.Skyboxes), -- NOTE: Keys is a custom function.
         Multi = false,
@@ -4964,15 +5050,6 @@ local Storage = {
         end
     })
 
-    Groups.Misc.Other:AddToggle('Invisibility', {
-        Text = 'Invisibility (server-side)', Tooltip = nil,
-        Default = false,
-
-        Callback = function(Value)
-            Config.Misc.Other.Invisibility = Value
-        end
-    })
-
     Groups.Misc.Other:AddSlider('HipHeightValue', {
         Text = 'Hip height', Tooltip = nil,
 
@@ -4983,6 +5060,14 @@ local Storage = {
             Config.Misc.Other.HipHeight = Value
         end
     })
+
+    Groups.Settings.Menu:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
+        Text = 'Menu keybind'
+        Default = 'Insert', 
+        NoUI = true,
+    })
+
+    Library.ToggleKeybind = Options.MenuKeybind
 
     if OverrideUserSettings then
         Groups.Settings.Menu:AddButton('Load DarkDex', function()
@@ -4999,12 +5084,12 @@ local Storage = {
 
     -- This is only used for pointing the muzzle torwards our ragebot target.
     function PhantomForces:MakeObjectLookAt(Model, TargetParts, HitboxPosition)
-        for i, Part in ipairs(Model:GetChildren()) do
+        for _, Part in ipairs(Model:GetChildren()) do
             local Joints = Part:GetJoints()
-
+    
             if Joints ~= nil then
-                for _, PartName in pairs(TargetParts) do
-                    if Part.Name == PartName then
+                for i, PartName in ipairs(TargetParts) do
+                    if Part.Name:find(PartName) then
                         Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
                     end
                 end
@@ -5233,7 +5318,7 @@ local Storage = {
 -- Features -> Visuals
     local Visuals = {}
 
-    function Visuals:Update()
+    function Visuals:UpdatePlayers()
         local PlayerModels = PhantomForces:GetPlayerModels()
 
         if Config.Visuals.Players.Boxes.Enabled and PlayerModels ~= nil then
@@ -5247,43 +5332,24 @@ local Storage = {
                         local ScreenPosition, OnScreen = Camera:WorldToViewportPoint(Torso.Position)
         
                         if OnScreen and tostring(PhantomForces:GetPlayerTeam(Player)) ~= Players.LocalPlayer.Team.Name then
-                            local Scale = 1000 / (Camera.CFrame.Position - Torso.Position).Magnitude * 80 / Camera.FieldOfView
+                            local Scale = math.floor(1000 / (Camera.CFrame.Position - Torso.Position).Magnitude * 80 / Camera.FieldOfView)
                             
-                            local BoundingBox, Size = Player:GetBoundingBox()
+                            local BoundingBox, SizeVec3 = Player:GetBoundingBox()
+                            local Size = Vec3(math.floor(SizeVec3.X), math.floor(SizeVec3.Y), math.floor(SizeVec3.Z))
 
-                            Renderer:Rectangle(
-                                Player.Name .. "_Box",
-                                ScreenPosition - (Size * (Scale / 2)),
-                                Size * Scale,
-                                Config.Visuals.Players.Boxes.Color
-                            )
+                            Renderer:Rectangle(Player.Name .. "_Box", ScreenPosition - (Size * (Scale / 2)) - Vec3(1, 1, 1), (Size * Scale) + Vec3(2, 2, 2), ColorRGB(0, 0, 0))
+                            Renderer:Rectangle(Player.Name .. "_BoxOuter", ScreenPosition - (Size * (Scale / 2)) + Vec3(1, 1, 1), (Size * Scale) - Vec3(2, 2, 2), ColorRGB(0, 0, 0))
+                            Renderer:Rectangle(Player.Name .. "_BoxInner", ScreenPosition - (Size * (Scale / 2)), Size * Scale, Config.Visuals.Players.Boxes.Color)
                         end
                     end
                 end
             end
-        else
+        elseif PlayerModels ~= nil then
             Renderer:UnrenderAllExcept({'FOVCircle', 'CrosshairHorizontal', 'CrosshairVertical'})
         end
+    end
 
-        if Config.Visuals.Other.Crosshair.Enabled then
-            Renderer:Line(
-                "CrosshairVertical",
-                Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 - 10),
-                Vec2(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + 10),
-                Config.Visuals.Other.Crosshair.Color,
-                2
-            )
-            Renderer:Line(
-                "CrosshairHorizontal",
-                Vec2(Camera.ViewportSize.X / 2 - 10, Camera.ViewportSize.Y / 2),
-                Vec2(Camera.ViewportSize.X / 2 + 10, Camera.ViewportSize.Y / 2),
-                Config.Visuals.Other.Crosshair.Color,
-                2
-            )
-        else
-            Renderer:Unrender({'CrosshairHorizontal', 'CrosshairVertical'})
-        end
-
+    function Visuals:UpdateFovCircle()
         if Config.Visuals.Other.VisualizeFOV.Enabled then
             local MousePosition = UserInputService:GetMouseLocation()
 
@@ -5294,7 +5360,26 @@ local Storage = {
         else
             Renderer:Unrender({'FOVCircle'})
         end
+    end
 
+    function Visuals:UpdateCrosshair()
+        if Config.Visuals.Other.Crosshair.Enabled then
+            Renderer:Line("CrosshairVertical",
+                Vec2(Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2 - 10),
+                Vec2(Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2 + 10),
+                Config.Visuals.Other.Crosshair.Color, 2
+            )
+            Renderer:Line("CrosshairHorizontal",
+                Vec2(Storage.ScreenSize.X / 2 - 10, Storage.ScreenSize.Y / 2),
+                Vec2(Storage.ScreenSize.X / 2 + 10, Storage.ScreenSize.Y / 2),
+                Config.Visuals.Other.Crosshair.Color, 2
+            )
+        else
+            Renderer:Unrender({'CrosshairHorizontal', 'CrosshairVertical'})
+        end
+    end
+
+    function Visuals:UpdateAmbientLighting()
         if Config.Visuals.World.OverrideAmbient.Enabled and Lighting then
             if not Storage.WorldAmbientsOriginal then
                 Storage.WorldAmbientsOriginal = {
@@ -5309,19 +5394,38 @@ local Storage = {
             Lighting["OutdoorAmbient"]    = Config.Visuals.World.OverrideAmbient.Color
             Lighting["ColorShift_Top"]    = Config.Visuals.World.OverrideAmbient.Color
             Lighting["ColorShift_Bottom"] = Config.Visuals.World.OverrideAmbient.Color
-
         elseif Storage.WorldAmbientsOriginal then
             for name, v in pairs(Storage.WorldAmbientsOriginal) do
                 Lighting[name] = v
             end
         end
+    end
 
+    function Visuals:UpdateSkybox()
         local Sky = Lighting:FindFirstChildOfClass("Sky")
 
         if Config.Visuals.World.SkyboxChanger.Enabled and Sky then
             if not Storage.SkyboxOriginal then
-                Storage.SkyboxOriginal = Sky
+                Storage.SkyboxOriginal = {
+                    ["SkyboxBk"] = Sky.SkyboxBk,
+                    ["SkyboxDn"] = Sky.SkyboxDn,
+                    ["SkyboxFt"] = Sky.SkyboxFt,
+                    ["SkyboxLf"] = Sky.SkyboxLf,
+                    ["SkyboxRt"] = Sky.SkyboxRt,
+                    ["SkyboxUp"] = Sky.SkyboxUp
+                }
             end
+
+            Sky:Destroy()
+
+            local NewSky = Instance.new("Sky")
+
+            for prop, value in pairs(Storage.Skyboxes[Config.Visuals.World.SkyboxChanger.Value]) do
+                NewSky[prop] = value
+            end
+
+            NewSky.StarCount = Config.Visuals.World.OverrideStarsCount.Enabled and Config.Visuals.World.OverrideStarsCount.Value or 0
+            NewSky.Parent = Lighting
 
             for _, v in pairs(Storage.Skyboxes[Config.Visuals.World.SkyboxChanger.Value]) do
                 if Sky[_] ~= v then
@@ -5329,21 +5433,88 @@ local Storage = {
                 end
             end
         elseif Storage.SkyboxOriginal then
-            Sky = Storage.SkyboxOriginal
+            Sky:Destroy()
+        
+            local OriginalSky = Instance.new("Sky")
+
+            for prop, value in pairs(Storage.SkyboxOriginal) do
+                OriginalSky[prop] = value
+            end
+
+            OriginalSky.Parent = Lighting
+        
+            Storage.SkyboxOriginal = nil
         end
+    end
 
-        Lighting.Technology = Config.Visuals.World.OverrideTechnology
-        Lighting.Brightness = Config.Visuals.World.NightMode and 0.01 or 1
+    -- Ngl ts pasted from some script on cbro someone handed me the code over discord and I thought it was cool but Ive rewritten majority of it because it was just a 1 time load script
+    -- This needs to be recoded, it overrides materials and is kinda weird. code is also shit xuz im high AFFFF!!!!! i dont FUCKING care smd ill make it attractive when im sober
+    local WorldNeedsUpdate = Config.Visuals.World.OverrideWorldMaterials
 
-        if Config.Visuals.World.MirrorWorld then
-            --[[for _, v in pairs(Workspace.Map.MapParts) do
-                if v:IsA("Part") then
-                    v.Reflectance = 1
+    function Visuals:UpdateWorldMaterials()
+        if WorldNeedsUpdate ~= Config.Visuals.World.OverrideWorldMaterials then
+            WorldNeedsUpdate = Config.Visuals.World.OverrideWorldMaterials
+
+            if Config.Visuals.World.OverrideWorldMaterials ~= 'Default' then
+                for _, Part in pairs(workspace:GetDescendants()) do
+                    if Part:IsA("BasePart") then
+                        -- Remove existing override textures
+                        for _, Texture in pairs(Part:GetChildren()) do
+                            if Texture:IsA("Texture") and Texture.Name:match('^OverrideTexture_') then
+                                Texture:Destroy()
+                            end
+                        end
+        
+                        for TextureName, TextureId in pairs(Storage.MapMaterials[Config.Visuals.World.OverrideWorldMaterials]) do
+                            if Part.Material.Name == TextureName then
+                                for _, Face in pairs({"Front", "Back", "Bottom", "Top", "Right", "Left"}) do
+                                    local NewTextureName = 'OverrideTexture_' .. Face
+
+                                    if not Part:FindFirstChild(NewTextureName) then
+                                        local NewTexture = Instance.new("Texture", Part)
+                                        NewTexture.Name = NewTextureName
+                                        NewTexture.ZIndex = 2147483647
+                                        NewTexture.Face = Enum.NormalId[Face]
+                                        NewTexture.Texture = "rbxassetid://" .. TextureId
+                                        NewTexture.Transparency = Part.Transparency
+                                        NewTexture.Color3 = Part.Color
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
-            end]]
-        else
-            
+            else
+                for _, Part in pairs(workspace:GetDescendants()) do
+                    if Part:IsA("BasePart") then
+                        for _, Texture in pairs(Part:GetChildren()) do
+                            if Texture and Texture:IsA("Texture") and Texture.Name:match('^OverrideTexture_') then
+                                Texture:Destroy()
+                            end
+                        end
+                    end
+                end
+            end
         end
+    end
+
+    function Visuals:Update()
+        if Config.Visuals.World.OverrideClockTime.Enabled then
+            Lighting.ClockTime = Config.Visuals.World.OverrideClockTime.Value
+        end
+        
+        Lighting.Technology = Config.Visuals.World.OverrideTechnology
+        
+        coroutine.wrap(function()
+            self:UpdatePlayers()
+        end)()
+
+        self:UpdateFovCircle()
+        self:UpdateCrosshair()
+        self:UpdateAmbientLighting()
+        self:UpdateWorldMaterials()
+
+        self:UpdateSkybox()
     end
 --
 
@@ -5481,8 +5652,8 @@ local Storage = {
     end
 
     function Chams:Update()
-        Chams:UpdateViewmodel()
-        Chams:UpdatePlayers()
+        self:UpdateViewmodel()
+        self:UpdatePlayers()
     end
 --
 
@@ -5490,24 +5661,7 @@ local Storage = {
     local Antiaim = {}
 
     function Antiaim:Run()
-        if Config.Antiaim.FakeLag.Enabled then
-            if (Camera.CFrame.Position - Storage.LastTickChoked.Position).Magnitude > Storage.FakeLagDistance or tick() - Storage.LastTickChoked.Tick > 1 then
-                if Players.LocalPlayer ~= nil then
-                    Storage.FakeLagDistance = math.random(Config.Antiaim.FakeLag.MinDistance, Config.Antiaim.FakeLag.MaxDistance)
-                    
-                    Storage.LastTickChoked = { 
-                        Position = Camera.CFrame.Position,
-                        Tick = tick()
-                    }
-                end
-
-                NetworkClient:SetOutgoingKBPSLimit(0)
-                Storage.ArePacketsChoked = false
-            else
-                NetworkClient:SetOutgoingKBPSLimit(Storage.FakeLagDistance)
-                Storage.ArePacketsChoked = true
-            end
-        end
+        
     end
 --
 
@@ -5675,7 +5829,7 @@ local Storage = {
 
         local PlayerModels, Gun = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetGun()
 
-        if not Storage.ArePacketsChoked and PlayerModels ~= nil and Gun ~= nil then
+        if PlayerModels ~= nil and Gun ~= nil then
             local Target = Ragebot:GetTarget(PlayerModels, Gun)
             
             if next(Target) then
@@ -5689,8 +5843,8 @@ local Storage = {
     end
 
     -- Automatic fire, This will be recoded once we have a better executor.
-    game:GetService("RunService").RenderStepped:Connect(function()
-        local ScreenCenter = Camera.ViewportSize / 2
+    RunService.RenderStepped:Connect(function()
+        local ScreenCenter = Storage.ScreenSize / 2
 
         if Config.Ragebot.General.Enabled and PhantomForces.LocalPlayer:IsAlive() and Storage.AimbotFiring then
             if Config.Ragebot.General.AutoFire and not Storage.AutoFireClick then
@@ -5705,12 +5859,13 @@ local Storage = {
 --
 
 -- Main feature loop
-game:GetService("RunService").RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function()
     if Library.Unloaded then
         return
     end
 
     Ragebot:Run()
+    Antiaim:Run()
     Visuals:Update()
     Chams:Update()
     Misc:Run()
