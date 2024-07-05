@@ -4146,6 +4146,127 @@ local Redacted = {
     end
 --
 
+-- Get Services
+    local Teams = game:GetService('Teams')
+    local Debris = game:GetService("Debris")
+    local Players = game:GetService("Players")
+    local Lighting = game:GetService("Lighting")
+    local Workspace = game:GetService("Workspace")
+    local RunService = game:GetService("RunService")
+    local HttpService = game:GetService("HttpService")
+    local NetworkClient = game:GetService("NetworkClient")
+    local TeleportService = game:GetService("TeleportService")
+    local UserInputService = game:GetService("UserInputService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local MarketPlaceService = game:GetService("MarketplaceService")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+--
+
+-- Get/Create Game Vars
+    local Enviornment = getgenv()
+    local Camera = Workspace.CurrentCamera
+    local Base64Encode = base64encode
+    local Base64Decode = base64decode
+    local ColorRGB = Color3.fromRGB
+    local ColorHSV = Color3.fromHSV
+    local ColorHex = Color3.fromHex
+    local Vec2 = Vector2.new
+    local Vec3 = Vector3.new
+--
+
+--[[ Get Phantom Force modules (Stolen from moonlight because this is so minimalistic)
+    local Modules = {Stored = {}}
+
+    for _,instance in next, getnilinstances() do
+        set_thread_identity(8)
+        
+        if not instance then
+            continue
+        end
+        
+        if not instance:IsA("ModuleScript") then
+            continue
+        end
+
+        local Required = nil
+
+        pcall(function()
+            Required = require(instance)
+        end)
+
+        if not Required then
+            continue
+        end
+
+        Modules.Stored[instance.Name] = Required
+    end
+
+    for _,instance in next, getloadedmodules() do
+        set_thread_identity(8)
+
+        if Modules.Stored[instance.Name] then
+            continue
+        end
+
+        local Required = nil
+
+        pcall(function()
+            Required = require(instance)
+        end)
+
+        if not Required then
+            continue
+        end
+
+        Modules.Stored[instance.Name] = Required
+    end
+
+    function Modules:GetFromProp(prop)
+        local Module = nil
+        for _,v in next, Modules.Stored do
+                if type(v) == "table" and rawget(v, prop) then
+                warn(_, v, prop)
+                table.foreach(v, print)
+
+                Module = v
+            end
+        end
+
+        return Module
+    end
+
+    function Modules:Get(name)   
+        return Modules.Stored[name] or nil
+    end
+
+    local RoundSystemClientInterface = Modules:GetFromProp("RoundSystemClientInterface")
+    local WeaponControllerInterface = Modules:GetFromProp("WeaponControllerInterface")
+    local PlayerDataClientInterface = Modules:GetFromProp("PlayerDataClientInterface")
+    local HudCrosshairsInterface = Modules:GetFromProp("HudCrosshairsInterface") 
+    local LeaderboardInterface = Modules:GetFromProp("LeaderboardInterface")
+    local ReplicationInterface = Modules:GetFromProp("ReplicationInterface")
+    local CharacterInterface = Modules:GetFromProp("CharacterInterface")
+    local ActiveLoadoutUtils = Modules:GetFromProp("ActiveLoadoutUtils")
+    local PlayerStatusEvents = Modules:GetFromProp("PlayerStatusEvents")
+    local ReplicationObject = Modules:GetFromProp("ReplicationObject")
+    local ThirdPersonObject = Modules:GetFromProp("ThirdPersonObject")
+    local ContentDatabase = Modules:GetFromProp("ContentDatabase")
+    local BulletInterface = Modules:GetFromProp("BulletInterface")
+    local CharacterObject = Modules:GetFromProp("CharacterObject")
+    local CameraInterface = Modules:GetFromProp("CameraInterface")
+    local CameraObject = Modules:GetFromProp("MainCameraObject")
+    local PublicSettings = Modules:GetFromProp("PublicSettings")
+    local FirearmObject = Modules:GetFromProp("FirearmObject")
+    local NetworkClient = Modules:GetFromProp("NetworkClient")
+    local BulletObject = Modules:GetFromProp("BulletObject")
+    local MeleeObject = Modules:GetFromProp("MeleeObject")
+    local BulletCheck = Modules:GetFromProp("BulletCheck")
+    local GameClock = Modules:GetFromProp("GameClock")
+    local Physics = Modules:GetFromProp("PhysicsLib")
+    local Sound = Modules:GetFromProp("AudioSystem")
+    local Effects = Modules:GetFromProp("Effects")
+--]]
+
 -- Custom functions
     -- https://devforum.roblox.com/t/tutorial-check-if-an-object-has-property/1213998
     function ObjectHasProperty(object, propertyName)
@@ -4162,106 +4283,15 @@ local Redacted = {
         end
         return keyset
     end
---
 
--- Get Services
-    local Teams = game:GetService('Teams')
-    local Debris = game:GetService("Debris")
-    local Players = game:GetService("Players")
-    local Lighting = game:GetService("Lighting")
-    local Workspace = game:GetService("Workspace")
-    local RunService = game:GetService("RunService")
-    local HttpService = game:GetService("HttpService")
-    local NetworkClient = game:GetService("NetworkClient")
-    local TeleportService = game:GetService("TeleportService")
-    local UserInputService = game:GetService("UserInputService")
-    local VirtualInputManager = game:GetService("VirtualInputManager")
-    local MarketPlaceService = game:GetService("MarketplaceService")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
---
-
--- Get/Create Game Vars
-    local Enviornment = getgenv()
-    local Camera = Workspace.CurrentCamera
-    local Base64Encode = base64encode
-    local Base64Decode = base64decode
-    local ColorRGB = Color3.fromRGB
-    local ColorHSV = Color3.fromHSV
-    local ColorHex = Color3.fromHex
-    local Vec2 = Vector2.new
-    local Vec3 = Vector3.new
---
-
---[[ Get Phantom Force modules (Stolen from moonlight because this is so minimalistic)
-    local Modules = {}
-
-    for _, Instance in pairs(getnilinstances()) do
-        if not instance:IsA("ModuleScript") then
-            continue
-        end
-
-        local Required = nil
-        
-        pcall(function()
-            Required = require(instance)
-        end)
-
-        if not Required then
-            continue
-        end
-
-        Modules[Instance.Name] = Required
+    function RoundDecimal(num, DecimalPlaces)
+        return tonumber(string.format("%." .. (DecimalPlaces or 0) .. "f", num))
     end
 
-    for _, Instance in pairs(getloadedmodules()) do
-        if Modules[instance.Name] then
-            continue
-        end
-
-        local Required = nil
-
-        pcall(function()
-            Required = require(instance)
-        end)
-
-        if not Required then
-            continue
-        end
-
-        Modules[Instance.Name] = Required
+    function RoundVec3(Vector, DecimalPlaces)
+        return Vec3(RoundDecimal(Vector.X, 1), RoundDecimal(Vector.Y, 1), RoundDecimal(Vector.Z, 1))
     end
-
-    function GetModule(name)
-        return Modules[name] or nil
-    end
-
-    local RoundSystemClientInterface = GetModule("RoundSystemClientInterface")
-    local WeaponControllerInterface = GetModule("WeaponControllerInterface")
-    local PlayerDataClientInterface = GetModule("PlayerDataClientInterface")
-    local HudCrosshairsInterface = GetModule("HudCrosshairsInterface") 
-    local LeaderboardInterface = GetModule("LeaderboardInterface")
-    local ReplicationInterface = GetModule("ReplicationInterface")
-    local CharacterInterface = GetModule("CharacterInterface")
-    local ActiveLoadoutUtils = GetModule("ActiveLoadoutUtils")
-    local PlayerStatusEvents = GetModule("PlayerStatusEvents")
-    local ReplicationObject = GetModule("ReplicationObject")
-    local ThirdPersonObject = GetModule("ThirdPersonObject")
-    local ContentDatabase = GetModule("ContentDatabase")
-    local BulletInterface = GetModule("BulletInterface")
-    local CharacterObject = GetModule("CharacterObject")
-    local CameraInterface = GetModule("CameraInterface")
-    local CameraObject = GetModule("MainCameraObject")
-    local PublicSettings = GetModule("PublicSettings")
-    local FirearmObject = GetModule("FirearmObject")
-    local NetworkClient = GetModule("NetworkClient")
-    local BulletObject = GetModule("BulletObject")
-    local MeleeObject = GetModule("MeleeObject")
-    local BulletCheck = GetModule("BulletCheck")
-    local GameClock = GetModule("GameClock")
-    local Physics = GetModule("PhysicsLib")
-    local Sound = GetModule("AudioSystem")
-    local Effects = GetModule("Effects")
---]]
+--
 
 -- Config/Stored menu variables
     local Config = {
@@ -4659,14 +4689,14 @@ local Storage = {
         end
     })
 
-    Groups.Ragebot.General:AddToggle('RagebotAutoWall', {
+    --[[Groups.Ragebot.General:AddToggle('RagebotAutoWall', {
         Text = 'Auto wall', Tooltip = nil,
         Default = false,
 
         Callback = function(Value)
             Config.Ragebot.General.AutoWall = Value
         end
-    })
+    })]]
 
     Groups.Ragebot.General:AddToggle('RagebotAutoShoot', {
         Text = 'Auto shoot', Tooltip = nil,
@@ -5028,7 +5058,7 @@ local Storage = {
     Groups.Misc.Movement:AddSlider('FlyHackValue', {
         Text = 'Flyhack speed', Tooltip = nil,
 
-        Default = 50,  Min = 0,  Max = 100, Rounding = 1,
+        Default = 50,  Min = 0,  Max = 50, Rounding = 1,
         Compact = false,
 
         Callback = function(Value)
@@ -5047,7 +5077,7 @@ local Storage = {
     Groups.Misc.Movement:AddSlider('SpeedHackValue', {
         Text = 'Speedhack speed', Tooltip = nil,
 
-        Default = 50,  Min = 0,  Max = 100, Rounding = 1,
+        Default = 50,  Min = 0,  Max = 50, Rounding = 1,
         Compact = false,
 
         Callback = function(Value)
@@ -5090,11 +5120,17 @@ local Storage = {
     -- This is only used for pointing the muzzle torwards our ragebot target.
     function PhantomForces:MakeObjectLookAt(Model, HitboxPosition)
         for _, Part in ipairs(Model:GetChildren()) do
+            if not Part then
+                continue
+            end
+
             local Joints = Part:GetJoints()
     
-            --We get Flame & FlameSUP with sizes now and the sightmark by detecting a SurfaceGui
             if Joints ~= nil and #Joints > 0 then
-                if Part and (Part.Size == Vec3(0.2, 0.2, 0.2) or Part:FindFirstChildWhichIsA("SurfaceGui")) then
+                -- SightMark detection: Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")
+                -- Flame/FlameSUP detection: RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")
+
+                if (RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")) or (Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")) then 
                     Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
                 end
             end
@@ -5103,23 +5139,26 @@ local Storage = {
 
     -- Returns the muzzle tip to our viewmodel weapon, bullets fire from this position so we use this for aimbot currently.
     function PhantomForces:GetMuzzleParts(Gun)
-        local Parts = Gun:GetChildren()
+        local MuzzleParts
+
+        for _, Part in ipairs(Model:GetChildren()) do
+            if not Part then
+                continue
+            end
+
+            local Joints = Part:GetJoints()
     
-        local function GetDistanceFromOrigin(part)
-            return (part.Position - Vector3.new(0, 0, 0)).Magnitude
+            if Joints ~= nil and #Joints > 0 then
+                -- SightMark detection: Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")
+                -- Flame/FlameSUP detection: RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")
+
+                if (RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")) or (Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")) then 
+                    table.insert(MuzzleParts, Part)
+                end
+            end
         end
 
-        table.sort(Parts, function(a, b)
-            return GetDistanceFromOrigin(a) > GetDistanceFromOrigin(b)
-        end)
-
-        local Muzzle = {}
-
-        for i = 1, math.min(3, #Parts) do
-            table.insert(Muzzle, Parts[i])
-        end
-
-        return Muzzle
+        return MuzzleParts
     end
 
     -- Returns Phantom Forces custom player models, The name variable is string encrypted under everything so don't even bother changing this.
@@ -5580,17 +5619,21 @@ local Storage = {
         end
     end
 
-    function Chams:ApplyChams(Model, DestroyParts, Material, Color)
+    function Chams:ApplyChams(Model, ExcludePartsWithColor, DestroyParts, Material, Color)
         if not Model then
             return
         end
 
-        for _, Part in pairs(Model:GetDescendants()) do
+        for _, Part in pairs(Model:GetChildren()) do
+            if not Part then
+                continue
+            end
+
             if table.find(DestroyParts, Part.ClassName) or table.find(DestroyParts, Part.Name) then
                 Part:Destroy()
             end
             
-            if Part:IsA("BasePart") then
+            if Part:IsA("BasePart") and not table.find(ExcludePartsWithColor, Part.Color) then
                 if Part.Transparency < 1 then
                     Part.Transparency = 0
                 end
@@ -5645,7 +5688,7 @@ local Storage = {
                 end
 
                 Chams:ApplyChams(
-                    Gun, {'Texture'},
+                    Gun, {ColorRGB(255, 152, 220)}, {'Texture'},
                     Config.Visuals.Players.WeaponChams.Material,
                     Config.Visuals.Players.WeaponChams.Color
                 )
@@ -5663,7 +5706,7 @@ local Storage = {
                     end
         
                     Chams:ApplyChams(
-                        Arm, {'Sleeves'},
+                        Arm, {}, {'Sleeves'},
                         Config.Visuals.Players.ArmChams.Material,
                         Config.Visuals.Players.ArmChams.Color
                     )
@@ -5868,22 +5911,18 @@ local Storage = {
                 end
             end
         end
-    end
 
-    -- Automatic fire, This will be recoded once we have a better executor.
-    RunService.RenderStepped:Connect(function()
-        local ScreenCenter = Storage.ScreenSize / 2
-
-        if Config.Ragebot.General.Enabled and PhantomForces.LocalPlayer:IsAlive() and Storage.AimbotFiring then
-            if Config.Ragebot.General.AutoFire and not Storage.AutoFireClick then
-                VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, true, game, 0)
-                Storage.AutoFireClick = true
-            end
-        elseif Storage.AutoFireClick then
-            VirtualInputManager:SendMouseButtonEvent(ScreenCenter.X, ScreenCenter.Y, 0, false, game, 0)
-            Storage.AutoFireClick = false
+        -- Automatic shoot/fire. Can't use VirtualInputManager anymore PF Broke it lol
+        if Config.Ragebot.General.AutoFire and Storage.AimbotFiring then
+            Storage.AutoFireClick = true
+            mouse1press()
         end
-    end)
+
+        if Storage.AutoFireClick and not Storage.AimbotFiring then
+            Storage.AutoFireClick = false
+            mouse1release()
+        end
+    end
 --
 
 -- Main feature loop
