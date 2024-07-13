@@ -5120,20 +5120,16 @@ local Storage = {
     -- This is only used for pointing the muzzle torwards our ragebot target.
     function PhantomForces:MakeObjectLookAt(Model, HitboxPosition)
         for _, Part in ipairs(Model:GetChildren()) do
-            if not Part then
+            if not (Part and Part.Transparency ~= 0) then
                 continue
             end
 
-            local Joints = Part:GetJoints()
-    
-            if Joints ~= nil and #Joints > 0 then
-                -- SightMark detection: Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")
-                -- Flame/FlameSUP detection: RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")
-
-                if (RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")) or (Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")) then 
-                    Joints[1].C0 = Joints[1].Part0.CFrame:ToObjectSpace(CFrame.lookAt(Joints[1].Part1.Position, HitboxPosition))
-                end
-            end
+            local LookVector = (HitboxPosition - Part.Position).unit
+            
+            local yaw = math.atan2(-LookVector.X, -LookVector.Z)
+            local pitch = math.asin(LookVector.Y)
+            
+            Part.Orientation = Vector3.new(math.deg(pitch), math.deg(yaw), 0)
         end
     end
 
@@ -5350,9 +5346,11 @@ local Storage = {
                 RootPart.Velocity = Vec3()
                 RootPart.Anchored = true
             end
+        elseif RootPart.Anchored then
+            RootPart.Anchored = false
         end
 
-        if PlayerModel ~= nil and Config.Misc.Movement.SpeedHack.Enabled and not Config.Misc.Movement.FlyHack.Enabled and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+        if not Config.Misc.Movement.FlyHack.Enabled and (Config.Misc.Movement.SpeedHack.Enabled and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)) then
             local LookVector = Camera.CFrame.LookVector
             local Direction = Vec3()
 
@@ -5974,6 +5972,7 @@ end)
 
 -- Unload feature
     Groups.Settings.Menu:AddButton('Unload', function()
+        Library:Notify('[RedactedProject] This feature is unsupported at the moment!')
         -- Removed for now, I couldnt care enough cuz 1/2 the time you need to relauch anyways.
         -- Add back before public/private release, we havent decided either yet also.
     end)
