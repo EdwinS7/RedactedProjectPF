@@ -4300,6 +4300,7 @@ local Redacted = {
                 Enabled = false,
                 FieldOfViewMode = 'Circle', -- {'Circle', 'Angle'}
                 FieldOfView = 180,
+                MaxDistance = 400,
 
                 TargetSelection = 'Crosshair', -- {'Crosshair', 'Distance', 'Health', 'Damage'}
 
@@ -4674,6 +4675,17 @@ local Storage = {
 
         Callback = function(Value)
             Config.Ragebot.General.FieldOfView = Value
+        end
+    })
+
+    Groups.Ragebot.General:AddSlider('RagebotMaxDistance', {
+        Text = 'Maximum distance', Tooltip = 'Maximum distance the aimbot is allowed for activation',
+
+        Default = 200, Min = 0, Max = 1000, Rounding = 1,
+        Compact = false,
+
+        Callback = function(Value)
+            Config.Ragebot.General.MaxDistance = Value
         end
     })
 
@@ -5820,6 +5832,12 @@ local Storage = {
                 local Parts = PhantomForces:GetPlayerParts(Target, true)
 
                 if not Torso or not Parts then 
+                    continue
+                end
+
+                local Distance = (Torso.Position - Camera.CFrame.Position).Magnitude
+
+                if Distance > Config.Ragebot.General.MaxDistance then
                     continue
                 end
 
