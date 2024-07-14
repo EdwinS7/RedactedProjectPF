@@ -5913,12 +5913,12 @@ local Storage = {
         -- Automatic shoot/fire. Can't use VirtualInputManager anymore PF Broke it lol
         if Config.Ragebot.General.AutoFire and Storage.AimbotFiring then
             Storage.AutoFireClick = true
-            mouse1press()
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
         end
 
         if Storage.AutoFireClick and not Storage.AimbotFiring then
             Storage.AutoFireClick = false
-            mouse1release()
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
         end
     end
 --
