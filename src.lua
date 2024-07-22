@@ -8,15 +8,7 @@ local OverrideUserSettings = true
 -- Script name: Redacted-project (placeholder)
 -- Script description: Phantom Forces Rage/Legit cheat
 
-local SupportedGames = { 
-    [292439477] = true, -- Phantom Forces
-    [299659045] = true -- Phantom Forces Test Place
-}
-
-if not SupportedGames[game.PlaceId] then
-    warn("[RedactedProject] Game unsupported! Clipboard set to PlaceId!")
-    setclipboard(tostring(game.PlaceId))
-end
+-- Removed PlaceID Check due to Celery breaking with it, I don't even know...
 
 -- Script settings
 local Redacted = {
@@ -5135,7 +5127,14 @@ local Storage = {
     -- This is only used for pointing the muzzle torwards our ragebot target.
     function PhantomForces:MakeObjectLookAt(Model, HitboxPosition)
         for _, Part in ipairs(Model:GetChildren()) do
-            if not (Part and Part.Transparency ~= 0) then
+            if not Part then
+                continue
+            end
+
+            -- SightMark detection: Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")
+            -- Flame/FlameSUP detection: RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld")
+
+            if not ((Part.Transparency > 0 and Part:FindFirstChildWhichIsA("SurfaceGui")) or (RoundVec3(Part.Size) == Vec3(0.2, 0.2, 0.2) and not Part:FindFirstChildWhichIsA("Weld"))) then 
                 continue
             end
 
@@ -5145,6 +5144,7 @@ local Storage = {
             local pitch = math.asin(LookVector.Y)
             
             Part.Orientation = Vector3.new(math.deg(pitch), math.deg(yaw), 0)
+            print("part rotation updated")
         end
     end
 
@@ -5922,7 +5922,7 @@ local Storage = {
         if PlayerModels ~= nil and Gun ~= nil then
             local Target = Ragebot:GetTarget(PlayerModels, Gun)
             
-            if next(Target) then
+            if next(Target) and Camera then
                 PhantomForces:MakeObjectLookAt(Gun, Target.AimPoint)
 
                 if Config.Ragebot.General.AutoFire then
