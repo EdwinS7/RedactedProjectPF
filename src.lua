@@ -19,7 +19,7 @@ local Redacted = {
 }
 
 -- Override Drawing Library so celery works (Using Solara's library) I should probably add a executor check but haha IDGAF YALL ALL USE THIS ANYWAYS (i think, except electron)
-loadstring(game:HttpGet("https://raw.githubusercontent.com/quivings/Solara/main/Storage/Drawing.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/EdwinS7/SolaraLua/main/Drawing.lua"))()
 
 -- UI Library
     local InputService = game:GetService('UserInputService');
