@@ -1,3 +1,8 @@
+if game.PlaceId == 5938036553 then
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/EdwinS7/RedactedProjectPF/main/Frontlines.lua"))()
+    return
+end
+
 -- Developers only, extra debugging options.
 local OverrideUserSettings = true
 
