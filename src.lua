@@ -4566,15 +4566,6 @@ local Storage = {
         }
     },
 
-    HitboxSizes = { -- PF Developers like to change these :) will break aimbot & esp if they do.
-        ["Head"] = Vec3(1, 1, 1),
-        ["Torso"] = Vec3(2, 2, 1),
-        ["LeftArm"] = Vec3(1, 2, 1),
-        ["RightArm"] = Vec3(1, 2, 1),
-        ["LeftLeg"] = Vec3(1, 2, 1),
-        ["RightLeg"] = Vec3(1, 2, 1)
-    },
-
     PartMaterials = {
         "Plastic", "Wood", "Slate",
         "Concrete", "CorrodedMetal", "DiamondPlate",
@@ -4584,6 +4575,13 @@ local Storage = {
         "SmoothPlastic", "Metal", "WoodPlanks",
         "Cobblestone", "Neon", "Glass",
         "ForceField"
+    },
+
+    HitboxMeshIds = {
+        ["Head"] = "rbxassetid://6179256256",
+        ["Torso"] = "rbxassetid://4049240078",
+        ["Legs"] = "rbxassetid://4049240209",
+        ["Arms"] = "rbxassetid://4049240323"
     },
 
     ScreenSize = Camera.ViewportSize,
@@ -4722,7 +4720,7 @@ local Storage = {
     Groups.Ragebot.General:AddDropdown('RagebotHitboxes', {
         Text = 'Hitboxes', Tooltip = 'Which hitboxes the aimbot will target',
 
-        Values = {'Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg'},
+        Values = {'Head', 'Torso', 'Arms', 'Legs'},
         Multi = true,
         Default = 0,
 
@@ -5149,7 +5147,6 @@ local Storage = {
             local pitch = math.asin(LookVector.Y)
             
             Part.Orientation = Vector3.new(math.deg(pitch), math.deg(yaw), 0)
-            print("part rotation updated")
         end
     end
 
@@ -5203,16 +5200,15 @@ local Storage = {
         end
     end
 
-    function PhantomForces:FindPartBySize(Target, Size)
-        -- Since the Arms and Legs have the same hitbox size, theres not really a way to tell them apart.
-        -- Phantom forces developers also like to encrypt anything under Workspace.Players, ex: Name for a player is a random string not an actual name.
-        -- Problem here is the leg and arm hitboxes ["Head"] = Vec3(1, 1, 1), ["Torso"] = Vec3(2, 2, 1), ["LeftArm"] = Vec3(1, 2, 1), ["RightArm"] = Vec3(1, 2, 1), ["LeftLeg"] = Vec3(1, 2, 1), ["RightLeg"] = Vec3(1, 2, 1)
-        -- There is no way to tell them apart, im too fucked up rn to fix this lmfaoooooo.
-
-        local RepeatHitboxes = {}
-
+    function PhantomForces:FindPartByMeshId(Target, MeshId)
         for _, Child in ipairs(Target:GetChildren()) do
-            if Child:IsA("BasePart") and Child.Size == Size then
+            local SpecialMesh = Child:FindFirstChildOfClass("SpecialMesh")
+
+            if not (Child:IsA("BasePart") and SpecialMesh) then
+                continue
+            end
+
+            if SpecialMesh.MeshId == MeshId then
                 return Child
             end
         end
@@ -5221,10 +5217,10 @@ local Storage = {
     end
 
     function PhantomForces:GetPlayerPart(Target, PartName)
-        for HitboxName, HitboxSize in pairs(Storage.HitboxSizes) do
-            local Part = PhantomForces:FindPartBySize(Target, HitboxSize)
+        for _, MeshId in pairs(Storage.HitboxMeshIds) do
+            local Part = PhantomForces:FindPartByMeshId(Target, MeshId)
 
-            if Part and Part:IsA("BasePart") and PartName == HitboxName then
+            if Part and Part:IsA("BasePart") and MeshId == Storage.HitboxMeshIds[PartName] then
                 return Part
             end
         end
@@ -5232,14 +5228,12 @@ local Storage = {
         return nil
     end
 
-    function PhantomForces:GetPlayerParts(Target, CheckConfig)
-        -- Move 'CheckConfig' to Ragebot, ts dumb but also helps with not getting unnecessary parts in turn increasing performance.
+    function PhantomForces:GetPlayerParts(Target)
         local Hitboxes = {}
 
-        for HitboxName, HitboxSize in pairs(Storage.HitboxSizes) do
-            if not CheckConfig or Config.Ragebot.General.Hitboxes[HitboxName] then
-                -- Check if we should skip the first match
-                local Part = PhantomForces:FindPartBySize(Target, HitboxSize)
+        for HitboxName, MeshId in pairs(Storage.HitboxMeshIds) do
+            if Config.Ragebot.General.Hitboxes[HitboxName] then
+                local Part = PhantomForces:FindPartByMeshId(Target, MeshId)
 
                 if Part and Part:IsA("BasePart") then
                     Hitboxes[HitboxName] = Part
@@ -5828,7 +5822,9 @@ local Storage = {
 --
 
 -- Features -> Ragebot
-    local Ragebot = {}
+    local Ragebot = {
+        Scoped = false
+    }
 
     function Ragebot:GetTarget(Targets, Gun)
         local MinDistance, MinCrosshairDistance = math.huge, math.huge
@@ -5837,7 +5833,7 @@ local Storage = {
         for i, Target in ipairs(Targets) do
             if Target ~= nil and tostring(PhantomForces:GetPlayerTeam(Target)) ~= Players.LocalPlayer.Team.Name then
                 local Torso = PhantomForces:GetPlayerPart(Target, "Torso") -- Used for FOV Check (temporary ill add a hitbox sys)
-                local Parts = PhantomForces:GetPlayerParts(Target, true)
+                local Parts = PhantomForces:GetPlayerParts(Target)
 
                 if not Torso or not Parts then 
                     continue
@@ -5915,6 +5911,10 @@ local Storage = {
         return BestTarget
     end
 
+    local function lerp(from, to, delta_time)
+        return from + (to - from) * delta_time
+    end
+
     function Ragebot:Run()
         Storage.TargetWithinFOV, Storage.AimbotFiring = false, false
 
@@ -5923,13 +5923,20 @@ local Storage = {
         end
 
         local PlayerModels, Gun, Arms = PhantomForces:GetPlayerModels(), PhantomForces.LocalPlayer:GetGun(), PhantomForces.LocalPlayer:GetArms()
-
+        
         if PlayerModels ~= nil and Gun ~= nil then
             local Target = Ragebot:GetTarget(PlayerModels, Gun)
             
-            if next(Target) and Camera then
-                PhantomForces:MakeObjectLookAt(Gun, Target.AimPoint)
+            if next(Target) and Camera and Ragebot.Scoped then
+                local ScreenPosition = Camera:WorldToScreenPoint(Target.AimPoint)
+                local MousePosition = Camera:WorldToScreenPoint(Mouse.Hit.Position)
+                
+                local OldX, OldY = (ScreenPosition.X - MousePosition.X), (ScreenPosition.Y - MousePosition.Y)
+                
+                mousemoverel(OldX * 0.75, OldY * 0.75)
 
+                -- High coding brrrrrr
+                -- Will miss, ik cuz of new aimbot, idgaf this project is no longer maintained im working on recode.
                 if Config.Ragebot.General.AutoFire then
                     Storage.AimbotFiring = true
                 end
@@ -5939,28 +5946,54 @@ local Storage = {
         -- Automatic shoot/fire. Can't use VirtualInputManager anymore PF Broke it lol
         if Config.Ragebot.General.AutoFire and Storage.AimbotFiring then
             Storage.AutoFireClick = true
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+
+            VirtualInputManager:SendMouseButtonEvent(
+                Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2, 0, true, game, 0
+            )
         end
 
         if Storage.AutoFireClick and not Storage.AimbotFiring then
             Storage.AutoFireClick = false
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            
+            VirtualInputManager:SendMouseButtonEvent(
+                Storage.ScreenSize.X / 2, Storage.ScreenSize.Y / 2, 0, false, game, 0
+            )
         end
     end
 --
 
--- Main feature loop
-RunService.RenderStepped:Connect(function()
-    if Library.Unloaded then
-        return
-    end
+-- Connections
+    UserInputService.InputBegan:Connect(function(v)
+        if v.UserInputType == Enum.UserInputType.MouseButton2 then
+            Ragebot.Scoped = true
+        end
+    end)
 
-    Ragebot:Run()
-    Antiaim:Run()
-    Visuals:Update()
-    Chams:Update()
-    Misc:Run()
-end)
+    UserInputService.InputEnded:Connect(function(v)
+        if v.UserInputType == Enum.UserInputType.MouseButton2 then
+            Ragebot.Scoped = false
+        end
+    end)
+
+    RunService.Stepped:Connect(function()
+        if Library.Unloaded then
+            return
+        end
+
+        Ragebot:Run()
+        Antiaim:Run()
+        Misc:Run()
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if Library.Unloaded then
+            return
+        end
+
+        Visuals:Update()
+        Chams:Update()
+    end)
+--
 
 -- Signal change detections
     Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
