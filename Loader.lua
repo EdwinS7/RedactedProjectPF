@@ -7,7 +7,7 @@ local _SUPPORTED_GAMES = {
     [7796842481] = Repository .. "Riotfall.lua"           -- Riotfall
 }
 
-local our_game = _SUPPORTED_GAMES[PlaceId]
+local our_game = _SUPPORTED_GAMES[game.PlaceId]
 
 if not our_game then
     warn("[Loader] This game is currently unsupported!")
