@@ -5933,7 +5933,7 @@ local Storage = {
                 
                 local OldX, OldY = (ScreenPosition.X - MousePosition.X), (ScreenPosition.Y - MousePosition.Y)
                 
-                mousemoverel(OldX * 0.75, OldY * 0.75)
+                mousemoverel(OldX * 1.75, OldY * 1.75)
 
                 -- High coding brrrrrr
                 -- Will miss, ik cuz of new aimbot, idgaf this project is no longer maintained im working on recode.
